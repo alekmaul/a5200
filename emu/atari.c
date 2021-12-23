@@ -73,7 +73,7 @@
 #include "pia.h"
 #include "platform.h"
 #include "pokeysnd.h"
-#include "rtime.h"
+#include "rtime8.h"
 #include "sio.h"
 #include "util.h"
 #if !defined(BASIC) && !defined(CURSES_BASIC)
@@ -113,7 +113,7 @@
 int machine_type = MACHINE_5200;
 //int ram_size = 64;
 int ram_size = 16;
-int tv_mode = TV_PAL;
+int tv_mode = TV_NTSC;
 int disable_basic = TRUE;
 int enable_sio_patch = TRUE;
 
@@ -317,27 +317,18 @@ int Atari800_InitialiseMachine(void) {
 	return TRUE;
 }
 
-int Atari800_DetectFileType(const char *filename) {
+int Atari800_DetectFileType(const uint8_t *data, size_t size) {
 	UBYTE header[4];
-	int file_length;
-	FILE *fp = fopen(filename, "rb");
-	if (fp == NULL)
+	if (data == NULL || size < 4)
 		return AFILE_ERROR;
-	if (fread(header, 1, 4, fp) != 4) {
-		fclose(fp);
-		return AFILE_ERROR;
-	}
+	memcpy(header, data, 4);
 	switch (header[0]) {
 	case 0:
-		if (header[1] == 0 && (header[2] != 0 || header[3] != 0) /* && file_length < 37 * 1024 */) {
-			fclose(fp);
+		if (header[1] == 0 && (header[2] != 0 || header[3] != 0) /* && size < 37 * 1024 */) {
 			return AFILE_BAS;
 		}
 		break;
 	case 0x1f:
-		if (header[1] == 0x8b) {
-			fclose(fp);
-		}
 		break;
 	case '0':
 	case '1':
@@ -350,115 +341,70 @@ int Atari800_DetectFileType(const char *filename) {
 	case '8':
 	case '9':
 		if ((header[1] >= '0' && header[1] <= '9') || header[1] == ' ') {
-			fclose(fp);
 			return AFILE_LST;
 		}
 		break;
 	case 'A':
 		if (header[1] == 'T' && header[2] == 'A' && header[3] == 'R') {
-			fclose(fp);
 			return AFILE_STATE;
 		}
 		break;
 	case 'C':
 		if (header[1] == 'A' && header[2] == 'R' && header[3] == 'T') {
-			fclose(fp);
 			return AFILE_CART;
 		}
 		break;
 	case 'F':
 		if (header[1] == 'U' && header[2] == 'J' && header[3] == 'I') {
-			fclose(fp);
 			return AFILE_CAS;
 		}
 		break;
 	case 0x96:
 		if (header[1] == 0x02) {
-			fclose(fp);
 			return AFILE_ATR;
 		}
 		break;
 	case 0xf9:
 	case 0xfa:
-		fclose(fp);
 		return AFILE_DCM;
 	case 0xff:
 		if (header[1] == 0xff && (header[2] != 0xff || header[3] != 0xff)) {
-			fclose(fp);
 			return AFILE_XEX;
 		}
 		break;
 	default:
 		break;
 	}
-	file_length = Util_flen(fp);
-	fclose(fp);
 	/* 40K or a-power-of-two between 4K and CART_MAX_SIZE */
-	if (file_length >= 4 * 1024 && file_length <= CART_MAX_SIZE
-	 && ((file_length & (file_length - 1)) == 0 || file_length == 40 * 1024))
+	if (size >= 4 * 1024 && size <= CART_MAX_SIZE
+	 && ((size & (size - 1)) == 0 || size == 40 * 1024))
 		return AFILE_ROM;
 	/* BOOT_TAPE is a raw file containing a program booted from a tape */
-	if ((header[1] << 7) == file_length)
+	if ((header[1] << 7) == size)
 		return AFILE_BOOT_TAPE;
-	if ((file_length & 0x7f) == 0)
+	if ((size & 0x7f) == 0)
 		return AFILE_XFD;
 	return AFILE_ERROR;
 }
 
-int Atari800_OpenFile(const char *filename, int reboot, int diskno, int readonly) {
-  // Remove cart if exist
-  CART_Remove();
-  
-	int type = Atari800_DetectFileType(filename);
+int Atari800_OpenFile(const uint8_t *data, size_t size, int reboot, int diskno, int readonly) {
+	// Remove cart if exist
+	CART_Remove();
+
+	int type = Atari800_DetectFileType(data, size);
 
 	switch (type) {
-    case AFILE_ATR:
-    case AFILE_XFD:
-    case AFILE_ATR_GZ:
-    case AFILE_XFD_GZ:
-    case AFILE_DCM:
-      if (!SIO_Mount(diskno, filename, readonly))
-        return AFILE_ERROR;
-      if (reboot)
-        Coldstart();
-      break;
-    case AFILE_XEX:
-    case AFILE_BAS:
-    case AFILE_LST:
-      if (!BIN_loader(filename))
-        return AFILE_ERROR;
-      break;
-    case AFILE_CART:
-    case AFILE_ROM:
-      if (CART_Insert(filename) != 0) {
-        return AFILE_ERROR;
-      }
-      if (reboot)
-        Coldstart();
-      break;
-    case AFILE_CAS:
-    case AFILE_BOOT_TAPE:
-      if (!CASSETTE_Insert(filename))
-        return AFILE_ERROR;
-      if (reboot) {
-        hold_start = TRUE;
-        Coldstart();
-      }
-      break;
-    case AFILE_STATE:
-    case AFILE_STATE_GZ:
-#ifdef BASIC
-      fprintf(stderr,"State files are not supported in BASIC version");
-      return AFILE_ERROR;
-#else
-      if (!ReadAtariState(filename, "rb"))
-        return AFILE_ERROR;
-      /* Don't press Option */
-      consol_table[1] = consol_table[2] = 0xf;
-      break;
-#endif
-    default:
-      break;
+		case AFILE_CART:
+		case AFILE_ROM:
+			if (CART_Insert(data, size) != 0) {
+			  return AFILE_ERROR;
+			}
+			if (reboot)
+			  Coldstart();
+			break;
+		default:
+			type = AFILE_ERROR;
+			break;
 	}
 	return type;
 }
@@ -474,7 +420,7 @@ int Atari800_Initialise(void) {
 */
   
   Device_Initialise();
-	RTIME_Initialise();
+	RTIME8_Initialise();
 	SIO_Initialise ();
 	CASSETTE_Initialise();
 
@@ -650,8 +596,6 @@ void Atari800_Frame(unsigned int refresh_rate) {
 		refresh_counter = 0;
 		ANTIC_Frame(TRUE);
 		//INPUT_DrawMousePointer();
-		//Screen_DrawAtariSpeed();
-		//Screen_DrawDiskLED();
 	}
 	else {
 		ANTIC_Frame(FALSE);

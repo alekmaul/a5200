@@ -1,5 +1,5 @@
 /*
- * rtime.c - Emulate ICD R-Time 8 cartridge
+ * rtime8.c - Emulate ICD R-Time 8 cartridge
  *
  * Copyright (C) 2000 Jason Duerstock
  * Copyright (C) 2000-2005 Atari800 development team (see DOC/CREDITS)
@@ -25,32 +25,30 @@
 #include "config.h"
 #include <stdlib.h>	/* for NULL */
 #include <string.h>	/* for strcmp() */
-#ifdef HAVE_TIME_H
-#include <time.h>
-#endif
-#ifdef WIN32
-#include <windows.h>
-#endif
+
+#include <time/rtime.h>
 
 #include "atari.h"
 //#include "log.h"
 
-int rtime_enabled = 1;
+int rtime8_enabled = 1;
 
-static int rtime_state = 0;
+static int rtime8_state = 0;
 				/* 0 = waiting for register # */
 				/* 1 = got register #, waiting for hi nybble */
 				/* 2 = got hi nybble, waiting for lo nybble */
-static int rtime_tmp = 0;
-static int rtime_tmp2 = 0;
+static int rtime8_tmp = 0;
+static int rtime8_tmp2 = 0;
 
 static UBYTE regset[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-void RTIME_Initialise(void)
+void RTIME8_Initialise(void)
 {
+	rtime8_state = 0;
+	rtime8_tmp = 0;
+	rtime8_tmp2 = 0;
+	memset(regset, 0, sizeof(regset));
 }
-
-#if defined(WIN32) || (defined(HAVE_TIME) && defined(HAVE_LOCALTIME))
 
 static int hex2bcd(int h)
 {
@@ -59,96 +57,74 @@ static int hex2bcd(int h)
 
 static int gettime(int p)
 {
-#ifdef WIN32
-	SYSTEMTIME st;
-	GetLocalTime(&st);
-	switch (p) {
-	case 0:
-		return hex2bcd(st.wSecond);
-	case 1:
-		return hex2bcd(st.wMinute);
-	case 2:
-		return hex2bcd(st.wHour);
-	case 3:
-		return hex2bcd(st.wDay);
-	case 4:
-		return hex2bcd(st.wMonth);
-	case 5:
-		return hex2bcd(st.wYear % 100);
-	case 6:
-		return hex2bcd(((st.wDayOfWeek + 2) % 7) + 1);
-	}
-#else /* WIN32 */
 	time_t tt;
-	struct tm *lt;
+	struct tm lt;
 
 	tt = time(NULL);
-	lt = localtime(&tt);
+	rtime_localtime(&tt, &lt);
 
 	switch (p) {
 	case 0:
-		return hex2bcd(lt->tm_sec);
+		return hex2bcd(lt.tm_sec);
 	case 1:
-		return hex2bcd(lt->tm_min);
+		return hex2bcd(lt.tm_min);
 	case 2:
-		return hex2bcd(lt->tm_hour);
+		return hex2bcd(lt.tm_hour);
 	case 3:
-		return hex2bcd(lt->tm_mday);
+		return hex2bcd(lt.tm_mday);
 	case 4:
-		return hex2bcd(lt->tm_mon + 1);
+		return hex2bcd(lt.tm_mon + 1);
 	case 5:
-		return hex2bcd(lt->tm_year % 100);
+		return hex2bcd(lt.tm_year % 100);
 	case 6:
-		return hex2bcd(((lt->tm_wday + 2) % 7) + 1);
+		return hex2bcd(((lt.tm_wday + 2) % 7) + 1);
 	}
-#endif /* WIN32 */
+
 	return 0;
 }
 
 #define HAVE_GETTIME
 
-#endif /* defined(WIN32) || (defined(HAVE_TIME) && defined(HAVE_LOCALTIME)) */
-
-UBYTE RTIME_GetByte(void)
+UBYTE RTIME8_GetByte(void)
 {
-	switch (rtime_state) {
+	switch (rtime8_state) {
 	case 0:
 		/* iprintf("pretending rtime not busy, returning 0"); */
 		return 0;
 	case 1:
-		rtime_state = 2;
+		rtime8_state = 2;
 		return (
 #ifdef HAVE_GETTIME
-			rtime_tmp <= 6 ?
-			gettime(rtime_tmp) :
+			rtime8_tmp <= 6 ?
+			gettime(rtime8_tmp) :
 #endif
-			regset[rtime_tmp]) >> 4;
+			regset[rtime8_tmp]) >> 4;
 	case 2:
-		rtime_state = 0;
+		rtime8_state = 0;
 		return (
 #ifdef HAVE_GETTIME
-			rtime_tmp <= 6 ?
-			gettime(rtime_tmp) :
+			rtime8_tmp <= 6 ?
+			gettime(rtime8_tmp) :
 #endif
-			regset[rtime_tmp]) & 0x0f;
+			regset[rtime8_tmp]) & 0x0f;
 	}
 	return 0;
 }
 
-void RTIME_PutByte(UBYTE byte)
+void RTIME8_PutByte(UBYTE byte)
 {
-	switch (rtime_state) {
+	switch (rtime8_state) {
 	case 0:
-		rtime_tmp = byte & 0x0f;
-		rtime_state = 1;
+		rtime8_tmp = byte & 0x0f;
+		rtime8_state = 1;
 		break;
 	case 1:
-		rtime_tmp2 = byte << 4;
-		rtime_state = 2;
+		rtime8_tmp2 = byte << 4;
+		rtime8_state = 2;
 		break;
 	case 2:
-		regset[rtime_tmp] = rtime_tmp2 | (byte & 0x0f);
-		rtime_state = 0;
+		regset[rtime8_tmp] = rtime8_tmp2 | (byte & 0x0f);
+		rtime8_state = 0;
 		break;
 	}
 }

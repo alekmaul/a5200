@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include <stdio.h> /* FILENAME_MAX */
+#include <stdint.h>
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -14,7 +15,9 @@
 
 //#define PAGED_MEM
 
-#define PAGED_ATTRIB 1
+/* Note: Save states do not function correctly
+ * when PAGED_ATTRIB is set */
+//#define PAGED_ATTRIB 1
 
 #define ATARI_TITLE  "Atari 800 Emulator, Version 2.0.2"
 
@@ -28,14 +31,14 @@
 /* SBYTE and UBYTE must be exactly 1 byte long. */
 /* SWORD and UWORD must be exactly 2 bytes long. */
 /* SLONG and ULONG must be exactly 4 bytes long. */
-#define SBYTE signed char
-#define SWORD signed short
-#define SLONG signed int
-#define UBYTE unsigned char
-#define UWORD unsigned short
+#define SBYTE int8_t
+#define SWORD int16_t
+#define SLONG int32_t
+#define UBYTE uint8_t
+#define UWORD uint16_t
 #ifndef WIN32
 /* Windows headers typedef ULONG */
-#define ULONG unsigned int
+#define ULONG uint32_t
 #endif
 /* Note: in various parts of the emulator we assume that char is 1 byte
    and int is 4 bytes. */
@@ -168,13 +171,13 @@ int Atari800_InitialiseMachine(void);
 void Atari800_UpdatePatches(void);
 
 /* Auto-detects file type and returns one of AFILE_* values. */
-int Atari800_DetectFileType(const char *filename);
+int Atari800_DetectFileType(const uint8_t *data, size_t size);
 
 /* Auto-detects file type and mounts the file in the emulator.
    reboot: Coldstart() for disks, cartridges and tapes
    diskno: drive number for disks (1-8)
    readonly: mount disks as read-only */
-int Atari800_OpenFile(const char *filename, int reboot, int diskno, int readonly);
+int Atari800_OpenFile(const uint8_t *data, size_t size, int reboot, int diskno, int readonly);
 
 /* Checks for "popular" filenames of ROM images in the specified directory
    and sets atari_*_filename to the ones found.

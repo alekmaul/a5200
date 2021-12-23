@@ -59,7 +59,7 @@ int CART_Checksum(const UBYTE *image, int nbytes);
 #define CART_CANT_OPEN		-1	/* Can't open cartridge image file */
 #define CART_BAD_FORMAT		-2	/* Unknown cartridge format */
 #define CART_BAD_CHECKSUM	-3	/* Warning: bad CART checksum */
-int CART_Insert(const char *filename);
+int CART_Insert(const uint8_t *data, size_t size);
 
 void CART_Remove(void);
 

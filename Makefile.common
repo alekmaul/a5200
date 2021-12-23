@@ -1,0 +1,56 @@
+LIBRETRO_DIR := $(CORE_DIR)/libretro
+LIBRETRO_COMM_DIR := $(LIBRETRO_DIR)/libretro-common
+CORE_SRC_DIR := $(CORE_DIR)/emu
+
+INCFLAGS := \
+	-I$(CORE_SRC_DIR) \
+	-I$(LIBRETRO_DIR) \
+	-I$(LIBRETRO_COMM_DIR)/include
+
+ifneq (,$(findstring msvc2003,$(platform)))
+	INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
+endif
+
+SOURCES_C := \
+	$(LIBRETRO_DIR)/libretro.c \
+	$(CORE_SRC_DIR)/antic.c \
+	$(CORE_SRC_DIR)/atari.c \
+	$(CORE_SRC_DIR)/atari_nds.c \
+	$(CORE_SRC_DIR)/binload.c \
+	$(CORE_SRC_DIR)/cartridge.c \
+	$(CORE_SRC_DIR)/cassette.c \
+	$(CORE_SRC_DIR)/compfile.c \
+	$(CORE_SRC_DIR)/cpu.itcm.c \
+	$(CORE_SRC_DIR)/devices.c \
+	$(CORE_SRC_DIR)/gtia.c \
+	$(CORE_SRC_DIR)/input.c \
+	$(CORE_SRC_DIR)/memory.c \
+	$(CORE_SRC_DIR)/pbi.c \
+	$(CORE_SRC_DIR)/pia.c \
+	$(CORE_SRC_DIR)/pokey.c \
+	$(CORE_SRC_DIR)/pokeysnd.c \
+	$(CORE_SRC_DIR)/rtime8.c \
+	$(CORE_SRC_DIR)/screen.c \
+	$(CORE_SRC_DIR)/sio.c \
+	$(CORE_SRC_DIR)/sound_nds.c \
+	$(CORE_SRC_DIR)/statesav.c \
+	$(CORE_SRC_DIR)/util.c \
+
+ifneq ($(STATIC_LINKING), 1)
+	SOURCES_C += \
+		$(LIBRETRO_COMM_DIR)/compat/compat_posix_string.c \
+		$(LIBRETRO_COMM_DIR)/compat/compat_snprintf.c \
+		$(LIBRETRO_COMM_DIR)/compat/compat_strcasestr.c \
+		$(LIBRETRO_COMM_DIR)/compat/compat_strl.c \
+		$(LIBRETRO_COMM_DIR)/compat/fopen_utf8.c \
+		$(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c \
+		$(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
+		$(LIBRETRO_COMM_DIR)/file/file_path.c \
+		$(LIBRETRO_COMM_DIR)/file/file_path_io.c \
+		$(LIBRETRO_COMM_DIR)/streams/file_stream.c \
+		$(LIBRETRO_COMM_DIR)/streams/file_stream_transforms.c \
+		$(LIBRETRO_COMM_DIR)/streams/memory_stream.c \
+		$(LIBRETRO_COMM_DIR)/string/stdstring.c \
+		$(LIBRETRO_COMM_DIR)/time/rtime.c \
+		$(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c
+endif

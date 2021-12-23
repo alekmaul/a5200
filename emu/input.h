@@ -247,15 +247,18 @@ extern int key_consol;	/* Start, Select and Option keys */
 
 extern int joy_autofire[4];		/* autofire mode for each Atari port */
 
-extern int joy_block_opposite_directions;	/* can't move joystick left
-											   and right simultaneously */
-
 extern int joy_multijoy;	/* emulate MultiJoy4 interface */
 
 /* 5200 joysticks values */
-extern int joy_5200_min;
-extern int joy_5200_center;
-extern int joy_5200_max;
+#define JOY_5200_MIN    6
+#define JOY_5200_CENTER 114
+#define JOY_5200_MAX    220
+
+extern unsigned int joy_5200_trig[4];
+extern unsigned int joy_5200_stick[4];
+extern unsigned int joy_5200_pot[8];
+
+extern unsigned int atari_analog[4];
 
 /* Mouse --------------------------------------------------------------- */
 

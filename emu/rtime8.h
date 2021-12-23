@@ -17,8 +17,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
 #include "atari.h"
 
-extern int rtime_enabled;
+extern int rtime8_enabled;
 
-void RTIME_Initialise(void);
-UBYTE RTIME_GetByte(void);
-void RTIME_PutByte(UBYTE byte);
+void RTIME8_Initialise(void);
+UBYTE RTIME8_GetByte(void);
+void RTIME8_PutByte(UBYTE byte);

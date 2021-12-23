@@ -3,6 +3,9 @@
 
 #include "atari.h"  /* UBYTE */
 
+#define ATARI_VISIBLE_WIDTH 336
+#define ATARI_LEFT_MARGIN 24
+
 #ifdef DIRTYRECT
 #ifndef CLIENTUPDATE
 extern UBYTE *screen_dirty;
@@ -12,26 +15,6 @@ void entire_screen_dirty(void);
 
 extern UWORD *atari_screen;
 
-#ifdef BITPL_SCR
-extern ULONG *atari_screen_b;
-extern ULONG *atari_screen1;
-extern ULONG *atari_screen2;
-#endif
-
-extern int screen_visible_x1;
-extern int screen_visible_y1;
-extern int screen_visible_x2;
-extern int screen_visible_y2;
-
-extern int show_atari_speed;
-extern int show_disk_led;
-extern int show_sector_counter;
-
-void Screen_Initialise(void);
-void Screen_DrawAtariSpeed(void);
-void Screen_DrawDiskLED(void);
-void Screen_FindScreenshotFilename(char *buffer);
-int Screen_SaveScreenshot(const char *filename, int interlaced);
-void Screen_SaveNextScreenshot(int interlaced);
+void Screen_Initialise(unsigned char *buf);
 
 #endif /* _SCREEN_H_ */

@@ -27,19 +27,156 @@
 #include <stdlib.h>
 #include <string.h>
 
-//ALEK #include "main.h"
-#include "shared.h"
+#include <encodings/crc32.h>
 
 #include "atari.h"
 #include "binload.h" /* loading_basic */
 #include "cartridge.h"
 #include "memory.h"
 #include "pia.h"
-#include "rtime.h"
+#include "rtime8.h"
 #include "util.h"
 #ifndef BASIC
 #include "statesav.h"
 #endif
+
+/*
+bd52623b  Defender # A5200.A52
+ce07d9ad  Diagnostic Cart.bin
+6a687f9c  Dig Dug # A5200.A52
+d3bd3221  Final Legacy (Prototype) # A5200.A52
+d3bd3221  FinalLegacy.bin
+04b299a4  Frisky Tom (Prototype) # A5200.A52
+0af19345  Frogger 2 - Threedeep! # A5200.A52
+1062ef6a  Frogger.bin
+0fe438b3  frogger2.bin
+04b299a4  frskytom.bin
+97b15243  Gorf.bin
+cfd4a7f9  Gyruss # A5200.A52
+cfd4a7f9  Gyruss.bin
+18a73af3  H.E.R.O. # A5200.A52
+18a73af3  H.E.R.O. (1984) (Activision).a52
+18a73af3  Hero.a52
+d9ae4518  James Bond 007 # A5200.A52
+d9ae4518  JamesBond007.bin
+bfd30c01  Joust # A5200.A52
+7c30592c  Jr Pac-Man # A5200.A52
+2c676662  Jungle Hunt # A5200.A52
+ecfa624f  Kangaroo # A5200.A52
+02cdfc70  KrazyShootOut.bin
+83517703  Last Starfighter # A5200.A52
+84df4925  Looney Tunes Hotel (Prototype # A5200.A52
+ab8e035b  Meteorites # A5200.A52
+931a454a  MICRGAMN.BIN
+931a454a  Microgammon SB (Prototype) # A5200.A52
+969cfe1a  Millipede # A5200.A52
+7df1adfb  Miner 2049 # A5200.A52
+c597c087  Miniature Golf # A5200.A52
+c597c087  MINIGOLF.BIN
+2a640143  Montezuma's Revenge # A5200.A52
+d0b2f285  Moon Patrol # A5200.A52
+457fb9b3  Mr. Do's Castle.bin
+752f5efd  Ms. Pac-Man # A5200.A52
+59983c40  pacjr52.bin
+8873ef51  Pac-Man # A5200.A52
+e9f826bd  pete.bin
+4b910461  Pitfall 2 - the Lost Caverns # A5200.A52
+4b910461  Pitfall II - The Lost Caverns (1984) (Activision).a52
+abc2d1e4  Pole Position # A5200.A52
+abc2d1e4  PolePosition.bin
+a18a9a40  Popeye # A5200.A52
+3c33f26e  Qbert.bin
+aea6d2c2  QIX # A5200.A52
+b5f3402b  Quest for Quintana Roo # A5200.A52
+4336c2cc  Realsports Football # A5200.A52
+ecbd1853  Realsports Soccer # A5200.A52
+10f33c90  Realsports Tennis # A5200.A52
+0f996184  RealsportsBasketballRev1.bin
+4336c2cc  RealsportsFootball.bin
+10f33c90  RealsportsTennis.bin
+a97606ab  Roadrunner # A5200.A52
+4252abd9  Robotron 2084 # A5200.A52
+b68d61e8  Space Dungeon # A5200.A52
+387365dc  Space Shuttle - a Journey Into Space # A5200.A52
+b68d61e8  SpaceDungeon.bin
+73b5b6fb  Sport Goofy (Prototype) # A5200.A52
+7d819a9f  Star Raiders # A5200.A52
+69f23548  Star Trek - Strategic Operations Simulator # A5200.A52
+75f566df  Star Wars - the Arcade Game # A5200.A52
+1d1cee27  Stargate # A5200.A52
+75f566df  StarWarsArcade.bin
+fd8f0cd4  Super Pac Man Final (5200).bin
+0a4ddb1e  Super Pac-Man (Prototype) # A5200.A52
+1187342f  Tempest (Prototype) # A5200.A52
+1187342f  Tempst52.bin
+0ba22ece  Track and Field # A5200.A52
+d6f7ddfd  Wizard of Wor# A5200.A52
+b8faaec3  Xari Arena (Prototype) # A5200.A52
+b8faaec3  xari52.bin
+12cc298f  yellwsub.bin
+2959d827  Zone Ranger # A5200.A52
+*/
+
+static int cart_find_16k_mapping(uint32_t crc)
+{
+	if (crc == 0x35484751 || /* AE                */
+		 crc == 0x9bae58dc || /* Beamrider         */
+		 crc == 0xbe3cd348 || /* Berzerk           */
+		 crc == 0xc8f9c094 || /* Blaster           */
+		 crc == 0x0624E6E7 || /* BluePrint         */
+		 crc == 0x9ad53bbc || /* ChopLifter        */
+		 crc == 0xf43e7cd0 || /* Decathlon         */
+		 crc == 0xd3bd3221 || /* Final Legacy      */
+		 crc == 0x18a73af3 || /* H.E.R.O           */
+		 crc == 0x83517703 || /* Last StarFigtr    */
+		 crc == 0xab8e035b || /* Meteorites        */
+		 crc == 0x969cfe1a || /* Millipede         */
+		 crc == 0x7df1adfb || /* Miner 2049er      */
+		 crc == 0xb8b6a2fd || /* Missle Command+   */
+		 crc == 0xd0b2f285 || /* Moon Patrol       */
+		 crc == 0xe8b130c4 || /* PAM Diags2.0      */
+		 crc == 0x4b910461 || /* Pitfall II        */
+		 crc == 0x47dc1314 || /* Preppie (Conv)    */
+		 crc == 0xF1E21530 || /* Preppie (Conv)    */
+		 crc == 0xb5f3402b || /* Quest Quintana    */
+		 crc == 0x4252abd9 || /* Robotron 2084     */
+		 crc == 0x387365dc || /* Space Shuttle     */
+		 crc == 0x82E2981F || /* Super Pacman      */
+		 crc == 0xFD8F0CD4 || /* Super Pacman      */
+		 crc == 0xa4ddb1e  || /* Super Pacman      */
+		 crc == 0xe80dbb2  || /* Time Runner (Conv) */
+		 crc == 0x0ba22ece || /* Track and Field   */
+		 crc == 0xd6f7ddfd || /* Wizard of Wor     */
+		 crc == 0x2959d827 || /* Zone Ranger       */
+		 crc == 0xB8FAAEC3 || /* Xari arena        */
+		 crc == 0x38F4A6A4   )/* Xmas (Demo)       */
+		return 2;
+
+	/* crc == 0x8d2aaab5 asteroid.bin */
+	/* crc == 0x4019ecec Astro Chase # A5200.A52 */
+	/* crc == 0xb3b8e314 Battlezone */
+	/* crc == 0x04807705 Buck Rogers - Planet of Zoom # A5200.A52 */
+	/* crc == 0x7a9d9f85 boogie.bin */
+	/* crc == 0x536a70fe Centipede # A5200.A52 */
+	/* crc == 0x536a70fe Centipede.bin */
+	/* crc == 0x82b91800 Congo Bongo # A5200.A52 */
+	/* crc == 0x82b91800 CongoBongo.bin */
+	/* crc == 0xfd541c80 Countermeasure # A5200.A52 */
+	/* crc == 0x1187342f Tempest  */
+	return 1;
+}
+
+static int cart_wait_on_type(uint32_t crc)
+{
+	int bRet=1;
+	unsigned int posdeb=2;
+
+	posdeb = cart_find_16k_mapping(crc) == 1 ? 18 : 2;
+
+	bRet = (posdeb == 2 ? 2 : 1);
+
+	return bRet;
+}
 
 int cart_kb[CART_LAST_SUPPORTED + 1] = {
 	    0,
@@ -103,8 +240,13 @@ int CART_IsFor5200(int type)
 	return FALSE;
 }
 
-UBYTE *cart_image = NULL;		/* For cartridge memory */
-char cart_filename[FILENAME_MAX];
+/* For cartridge memory */
+const UBYTE *cart_image = NULL;
+/* Holds a 'backup' reference to the cartridge
+ * memory provided by the platform host, to enable
+ * reinsertion on load state */
+static const uint8_t *platform_cart_image = NULL;
+static size_t platform_cart_size = 0;
 //LUDO: int cart_type = CART_NONE;
 int cart_type = CART_5200_32;
 
@@ -318,8 +460,8 @@ static void CART_Access(UWORD addr)
 /* a read from D500-D5FF area */
 UBYTE CART_GetByte(UWORD addr)
 {
-	if (rtime_enabled && (addr == 0xd5b8 || addr == 0xd5b9))
-		return RTIME_GetByte();
+	if (rtime8_enabled && (addr == 0xd5b8 || addr == 0xd5b9))
+		return RTIME8_GetByte();
 	CART_Access(addr);
 	return 0xff;
 }
@@ -327,8 +469,8 @@ UBYTE CART_GetByte(UWORD addr)
 /* a write to D500-D5FF area */
 void CART_PutByte(UWORD addr, UBYTE byte)
 {
-	if (rtime_enabled && (addr == 0xd5b8 || addr == 0xd5b9)) {
-		RTIME_PutByte(byte);
+	if (rtime8_enabled && (addr == 0xd5b8 || addr == 0xd5b9)) {
+		RTIME8_PutByte(byte);
 		return;
 	}
 	switch (cart_type) {
@@ -513,119 +655,95 @@ int CART_Checksum(const UBYTE *image, int nbytes)
 	return checksum;
 }
 
-extern unsigned int gameCRC;
-
-int CART_Insert(const char *filename) {
-#ifdef NOCASH
-  char sz[64]; sprintf(sz,"CART_Insert %s %08x\n",filename,cart_image);nocashMessage(sz);
-#endif
-
-	FILE *fp;
-	int len;
+int CART_Insert(const uint8_t *data, size_t size)
+{
 	int type;
 	UBYTE header[16];
 
 	/* remove currently inserted cart */
 	CART_Remove();
 
-	/* open file */
-	fp = fopen(filename, "rb");
-	if (fp == NULL) {
+	if (data == NULL || size < 16)
 		return CART_CANT_OPEN;
-  }
-	/* check file length */
-	len = Util_flen(fp);
-	Util_rewind(fp);
-
-	/* Save Filename for state save */
-	strcpy(cart_filename, filename);
 
 	/* if full kilobytes, assume it is raw image */
-	if ((len & 0x3ff) == 0) {
+	if ((size & 0x3ff) == 0) {
 #ifdef NOCASH
-    nocashMessage("raw image detected\n");
+		nocashMessage("raw image detected\n");
 #endif  
-		/* alloc memory and read data */
-		cart_image = (UBYTE *) Util_malloc(len);
-		fread(cart_image, 1, len, fp);
-		fclose(fp);
+		/* Assign pointers */
+		platform_cart_image = data;
+		platform_cart_size  = size;
+		cart_image          = (UBYTE *)data;
 		/* find cart type */
-    unsigned int crccomputed=crc32 (0, cart_image, len);
+		uint32_t crccomputed = encoding_crc32(0, cart_image, size);
 		cart_type = CART_NONE;
-		len >>= 10;	/* number of kilobytes */
+		size >>= 10;	/* number of kilobytes */
 		for (type = 1; type <= CART_LAST_SUPPORTED; type++)
-			if (cart_kb[type] == len) {
+			if (cart_kb[type] == size) {
 				if (cart_type == CART_NONE) {
 					cart_type = type;
-        }
-        else {
+				}
+				else {
 #ifdef NOCASH      
-      nocashMessage("multiple cart type");
+					nocashMessage("multiple cart type");
 #endif      
-		gameCRC = crccomputed;
-          cart_type = atari_waitoncardtype(crccomputed);
-          cart_type = (cart_type == 1 ? CART_5200_EE_16 : CART_5200_NS_16);
-          break;
-        }
+					cart_type = cart_wait_on_type(crccomputed);
+					cart_type = (cart_type == 1 ? CART_5200_EE_16 : CART_5200_NS_16);
+					break;
+				}
 			}
 		if (cart_type != CART_NONE) {
 			CART_Start();
 #ifdef NOCASH      
-      nocashMessage("found cart type");
+			nocashMessage("found cart type");
 #endif      
 			return 0;	
 		}
-		free(cart_image);
 		cart_image = NULL;
 		return CART_BAD_FORMAT;
 	}
 	/* if not full kilobytes, assume it is CART file */
-	fread(header, 1, 16, fp);
+	memcpy(header, data, 16);
 	if ((header[0] == 'C') &&
-		(header[1] == 'A') &&
-		(header[2] == 'R') &&
-		(header[3] == 'T')) {
+		 (header[1] == 'A') &&
+		 (header[2] == 'R') &&
+		 (header[3] == 'T')) {
 		type = (header[4] << 24) |
-			(header[5] << 16) |
-			(header[6] << 8) |
-			header[7];
-    if (CART_IsFor5200(type)) {fclose(fp); return CART_BAD_FORMAT; }
+				 (header[5] << 16) |
+				 (header[6] << 8) |
+				  header[7];
+		if (CART_IsFor5200(type)) { return CART_BAD_FORMAT; }
 		if (type >= 1 && type <= CART_LAST_SUPPORTED) {
 			int checksum;
-			len = cart_kb[type] << 10;
-			/* alloc memory and read data */
-			cart_image = (UBYTE *) Util_malloc(len);
-			fread(cart_image, 1, len, fp);
-			fclose(fp);
+			int size_corrected = cart_kb[type] << 10;
+			size_corrected = (size_corrected > size - 16) ? size - 16 : size_corrected;
+			/* Assign pointers */
+			platform_cart_image = data;
+			platform_cart_size  = size;
+			cart_image          = (UBYTE *)(data + 16);
 			checksum = (header[8] << 24) |
-				(header[9] << 16) |
-				(header[10] << 8) |
-				header[11];
+						  (header[9] << 16) |
+						  (header[10] << 8) |
+							header[11];
 			cart_type = type;
 			CART_Start();
-      {
-        int checksum2 = CART_Checksum(cart_image, len);
-			  int error = (checksum == checksum2) ? 0 : CART_BAD_CHECKSUM;
-        return error;
-      }
+			{
+				int checksum2 = CART_Checksum(cart_image, size_corrected);
+				int error = (checksum == checksum2) ? 0 : CART_BAD_CHECKSUM;
+				return error;
+			}
 		}
 	}
-	fclose(fp);
 	return CART_BAD_FORMAT;
 }
 
 void CART_Remove(void) {
 #ifdef NOCASH
-    char sz[64];sprintf(sz,"CART_Remove %08x\n",cart_image);nocashMessage(sz);
+	char sz[64];sprintf(sz,"CART_Remove %08x\n",cart_image);nocashMessage(sz);
 #endif
 	cart_type = CART_NONE;
-	if (cart_image != NULL) {
-#ifdef NOCASH
-    nocashMessage("free cart image\n");
-#endif
-		free(cart_image);
-		cart_image = NULL;
-	}
+	cart_image = NULL;
 	CART_Start();
 }
 
@@ -879,15 +997,11 @@ void CARTStateRead(void)
 	   reached the end of the file, this will just default to CART_NONE */
 	ReadINT(&savedCartType, 1);
 	if (savedCartType != CART_NONE) {
-		char filename[FILENAME_MAX];
-		ReadFNAME(filename);
-		if (filename[0]) {
-			/* Insert the cartridge... */
-			if (CART_Insert(filename) >= 0) {
-				/* And set the type to the saved type, in case it was a raw cartridge image */
-				cart_type = savedCartType;
-				CART_Start();
-			}
+		/* Insert the cartridge... */
+		if (CART_Insert(platform_cart_image, platform_cart_size) >= 0) {
+			/* And set the type to the saved type, in case it was a raw cartridge image */
+			cart_type = savedCartType;
+			CART_Start();
 		}
 	}
 }
@@ -896,9 +1010,6 @@ void CARTStateSave(void)
 {
 	/* Save the cartridge type, or CART_NONE if there isn't one...*/
 	SaveINT(&cart_type, 1);
-	if (cart_type != CART_NONE) {
-		SaveFNAME(cart_filename);
-	}
 }
 
 #endif

@@ -4,18 +4,14 @@
 
 #ifdef SOUND
 
+#include "sound.h"
 #include "pokeysnd.h"
-
-//#define DSPRATE 22050
-//#define DSPRATE 11025
-#define DSPRATE 44100
-
 
 void Sound_Initialise(void) {
 #ifdef STEREO_SOUND
-  Pokey_sound_init(FREQ_17_EXACT, DSPRATE, 2, 0);
+  Pokey_sound_init(FREQ_17_EXACT, SOUND_SAMPLE_RATE, 2, 0);
 #else
-  Pokey_sound_init(FREQ_17_EXACT, DSPRATE, 1, 0); //SND_BIT16);
+  Pokey_sound_init(FREQ_17_EXACT, SOUND_SAMPLE_RATE, 1, 0); //SND_BIT16);
 #endif
 }
 

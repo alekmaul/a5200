@@ -95,7 +95,6 @@ extern UBYTE P2PL;
 extern UBYTE P3PL;
 extern UBYTE PRIOR;
 extern UBYTE VDELAY;
-extern UBYTE POTENA;
 
 #ifdef USE_COLOUR_TRANSLATION_TABLE
 

@@ -594,7 +594,6 @@ void CASSETTE_TapeMotor(int onoff)
 
 void CASSETTE_AddScanLine(void)
 {
-	int tmp;
 	/* if motor on and a cassette file is opened, and not eof */
 	/* increment elapsed cassette time */
 	if (cassette_motor && (cassette_file != NULL)
@@ -606,7 +605,7 @@ void CASSETTE_AddScanLine(void)
 		   -2 leaves a safe timespan for letting get the bit out
 		   of the pokey */
 		if ((cassette_nextirqevent - cassette_elapsedtime) <= -2) {
-			tmp = SetNextByteTime_POKEY(-2);
+			SetNextByteTime_POKEY(-2);
 		}
 	}
 }

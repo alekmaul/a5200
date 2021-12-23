@@ -40,6 +40,8 @@
 #ifndef _POKEYSOUND_H
 #define _POKEYSOUND_H
 
+#include <stdint.h>
+
 #include "config.h"
 #include "pokey.h"
 
@@ -47,19 +49,13 @@
 #define _TYPEDEF_H
 
 /* define some data types to keep it platform independent */
-#ifdef COMP16					/* if 16-bit compiler defined */
-#define int8  char
-#define int16 int
-#define int32 long
-#else							/* else default to 32-bit compiler */
-#define int8  char
-#define int16 short
-#define int32 int
-#endif
+#define int8  int8_t
+#define int16 int16_t
+#define int32 int32_t
 
-#define uint8  unsigned int8
-#define uint16 unsigned int16
-#define uint32 unsigned int32
+#define uint8  uint8_t
+#define uint16 uint16_t
+#define uint32 uint32_t
 
 #endif
 
@@ -119,7 +115,7 @@ extern void (*Update_vol_only_sound)(void);
 int Pokey_sound_init(uint32 freq17, uint16 playback_freq, uint8 num_pokeys,
                      unsigned int flags
                      );
-//void Pokey_process(void *sndbuffer, unsigned int sndn);
+void Pokey_process(void *sndbuffer, unsigned sndn);
 int Pokey_DoInit(void);
 void Pokey_set_mzquality(int quality);
 

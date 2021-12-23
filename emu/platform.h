@@ -11,8 +11,9 @@ int Atari_Exit(int run_monitor);
 int Atari_Keyboard(void);
 void Atari_DisplayScreen(void);
 
-int Atari_PORT(int num);
-int Atari_TRIG(int num);
+unsigned int Atari_PORT(unsigned int num);
+unsigned int Atari_TRIG(unsigned int num);
+unsigned int Atari_POT(unsigned int num);
 
 #ifdef SUPPORTS_ATARI_CONFIGINIT
 /* This function sets the configuration parameters to default values */

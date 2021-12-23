@@ -25,11 +25,8 @@
 #include "config.h"
 #include <string.h>
 
-#define ALEKSCR_DIRECT 1
-#include "shared.h"
-
+/*#define ALEKSCR_DIRECT*/
 #define NO_YPOS_BREAK_FLICKER
-
 
 #include "antic.h"
 #include "atari.h"
@@ -2682,7 +2679,7 @@ void ANTIC_Frame(int draw_display) {
 		OVERSCREEN_LINE;
 	} while (ypos < 8);
 
-#ifdef ALEKSCR_DIRECT1
+#ifdef ALEKSCR_DIRECT
   scrn_ptr = bgGetGfxPtr(bg0); //(UWORD *) (0x06000000);
 #else
 	scrn_ptr = (UWORD *) atari_screen;

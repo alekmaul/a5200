@@ -27,24 +27,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HAVE_LIBPNG
-#include <png.h>
-#endif
-
-//ALEK #include "main.h"
-#include "shared.h"
-
 #include "antic.h"
 #include "atari.h"
 #include "screen.h"
 #include "sio.h"
 
-#define ATARI_VISIBLE_WIDTH 336
-#define ATARI_LEFT_MARGIN 24
-
-UWORD *atari_screen = (UWORD *) vidBuf;
+UWORD *atari_screen = NULL;
 
 #ifdef DIRTYRECT
 UBYTE *screen_dirty = NULL;
 #endif
 
+void Screen_Initialise(unsigned char *buf)
+{
+	atari_screen = (UWORD *)buf;
+}

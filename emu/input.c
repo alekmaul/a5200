@@ -43,14 +43,8 @@
 #include "input_win.h"
 #endif
 
-#ifdef DREAMCAST
-extern int Atari_POT(int);
-#else
-#define Atari_POT(x) 228
-#endif
-
 extern UBYTE PCPOT_input[8];
-extern unsigned int atari_analog;
+unsigned int atari_analog[4] = {0};
 
 int key_code = AKEY_NONE;
 int key_shift = 0;
@@ -58,13 +52,7 @@ int key_consol = CONSOL_NONE;
 
 int joy_autofire[4] = {AUTOFIRE_OFF, AUTOFIRE_OFF, AUTOFIRE_OFF, AUTOFIRE_OFF};
 
-int joy_block_opposite_directions = 1;
-
 int joy_multijoy = 0;
-
-#define joy_5200_min    6
-#define joy_5200_center 114
-#define joy_5200_max    220
 
 int mouse_mode = MOUSE_OFF;
 int mouse_port = 0;
@@ -89,7 +77,7 @@ int mouse_joy_inertia = 10;
 #define MOUSE_SHIFT 4
 #endif
 
-static UBYTE STICK[4], OLDSTICK[4];
+static UBYTE STICK[4];
 static UBYTE TRIG_input[4];
 
 //static int max_scanline_counter;
@@ -164,19 +152,19 @@ void INPUT_Frame(void) {
 		}
 	}
 
-	/* handle joysticks */
+	/* handle joysticks
+	 * > port 0: controller 1 + 2 */
 	i = Atari_PORT(0);
-  OLDSTICK[0] = STICK[0];OLDSTICK[1] = STICK[1];
 	STICK[0] = i & 0x0f;
 	STICK[1] = (i >> 4) & 0x0f;
 
-/*	i = Atari_PORT(1);
+	/* Ignore 4-player support for now... */
+	/*i = Atari_PORT(1);
 	STICK[2] = i & 0x0f;
 	STICK[3] = (i >> 4) & 0x0f;*/
 
-	//ALEK for (i = 0; i < 4; i++) {
-  for (i = 0; i < 2; i++) {
-		//if (joy_block_opposite_directions) {
+	for (i = 0; i < 2; i++) {
+		if (STICK[i] != STICK_CENTRE) {
 			if ((STICK[i] & 0x0c) == 0) {	/* right and left simultaneously */
 				if (last_stick[i] & 0x04)	/* if wasn't left before, move left */
 					STICK[i] |= 0x08;
@@ -197,10 +185,10 @@ void INPUT_Frame(void) {
 				last_stick[i] &= 0x0c;
 				last_stick[i] |= STICK[i] & 0x03;
 			}
-    /*
 		}
 		else
-			last_stick[i] = STICK[i];*/
+			last_stick[i] = STICK[i];
+
 		TRIG_input[i] = Atari_TRIG(i);
 		//ALEK if ((joy_autofire[i] == AUTOFIRE_FIRE && !TRIG_input[i]) || (joy_autofire[i] == AUTOFIRE_CONT))
 		//ALEK 	TRIG_input[i] = (nframes & 2) ? 1 : 0;
@@ -214,49 +202,33 @@ void INPUT_Frame(void) {
 	}
 	else {
 */  
-#define MAX_FORCE 6
-	for (i = 0; i < 2; i++) {
-      if ((STICK[i] & (STICK_CENTRE ^ STICK_LEFT)) == 0) {	
-        if (atari_analog) {
-          if (PCPOT_input[2 * i] >joy_5200_min) PCPOT_input[2 * i] -= MAX_FORCE;
-          if (PCPOT_input[2 * i] <=joy_5200_min) PCPOT_input[2 * i]= joy_5200_min; 
-        }
-        else
-          PCPOT_input[2 * i]= joy_5200_min; 
-      }
-      else if ((STICK[i] & (STICK_CENTRE ^ STICK_RIGHT)) == 0) {
-        if (atari_analog) {
-          if (PCPOT_input[2 * i] <joy_5200_max) PCPOT_input[2 * i] += MAX_FORCE;
-          if (PCPOT_input[2 * i] >=joy_5200_max) PCPOT_input[2 * i]= joy_5200_max; 
-        }
-        else
-          PCPOT_input[2 * i]= joy_5200_max; 
-      }
-      else {
-        if (!atari_analog) PCPOT_input[2 * i] = joy_5200_center;  
-      }
-      if ((STICK[i] & (STICK_CENTRE ^ STICK_FORWARD)) == 0) {
-        if (atari_analog) {
-          if (PCPOT_input[2 * i +1] >joy_5200_min) PCPOT_input[2 * i +1] -= MAX_FORCE;
-          if (PCPOT_input[2 * i +1] <=joy_5200_min) PCPOT_input[2 * i +1]= joy_5200_min; 
-        }
-        else {
-          PCPOT_input[2 * i +1]= joy_5200_min;
-        }
-      }
-      else if ((STICK[i] & (STICK_CENTRE ^ STICK_BACK)) == 0) {
-        if (atari_analog) {
-          if (PCPOT_input[2 * i +1] <joy_5200_max) PCPOT_input[2 * i +1] += MAX_FORCE;
-          if (PCPOT_input[2 * i +1] >=joy_5200_max) PCPOT_input[2 * i +1]= joy_5200_max; 
-        }
-        else
-          PCPOT_input[2 * i +1]= joy_5200_max;
-      }
-      else {
-        if (!atari_analog) PCPOT_input[2 * i + 1] = joy_5200_center;
-      }
-	}
 
+	for (i = 0; i < 4; i++) {
+		if (atari_analog[i]) {
+			PCPOT_input[(i << 1) + 0] = Atari_POT((i << 1) + 0);
+			PCPOT_input[(i << 1) + 1] = Atari_POT((i << 1) + 1);
+		}
+		else {
+			if ((STICK[i] & (STICK_CENTRE ^ STICK_LEFT)) == 0) {	
+				PCPOT_input[(i << 1) + 0]= JOY_5200_MIN; 
+			}
+			else if ((STICK[i] & (STICK_CENTRE ^ STICK_RIGHT)) == 0) {
+				PCPOT_input[(i << 1) + 0]= JOY_5200_MAX; 
+			}
+			else {
+				PCPOT_input[(i << 1) + 0] = JOY_5200_CENTER;  
+			}
+			if ((STICK[i] & (STICK_CENTRE ^ STICK_FORWARD)) == 0) {
+				PCPOT_input[(i << 1) + 1]= JOY_5200_MIN;
+			}
+			else if ((STICK[i] & (STICK_CENTRE ^ STICK_BACK)) == 0) {
+				PCPOT_input[(i << 1) + 1]= JOY_5200_MAX;
+			}
+			else {
+				PCPOT_input[(i << 1) + 1] = JOY_5200_CENTER;
+			}
+		}
+	}
 
 	TRIG[0] = TRIG_input[0];
 	TRIG[1] = TRIG_input[1];

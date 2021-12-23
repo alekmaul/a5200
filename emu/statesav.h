@@ -1,10 +1,11 @@
 #ifndef _STATESAV_H_
 #define _STATESAV_H_
 
+#include <stdint.h>
 #include "atari.h"
 
-int SaveAtariState(const char *filename, const char *mode, UBYTE SaveVerbose);
-int ReadAtariState(const char *filename, const char *mode);
+int SaveAtariState(uint8_t *data, size_t size, UBYTE SaveVerbose);
+int ReadAtariState(const uint8_t *data, size_t size);
 
 void SaveUBYTE(const UBYTE *data, int num);
 void SaveUWORD(const UWORD *data, int num);

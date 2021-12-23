@@ -74,7 +74,6 @@ UBYTE COLBK;
 UBYTE PRIOR;
 UBYTE VDELAY;
 UBYTE GRACTL;
-UBYTE POTENA;
 
 /* Internal GTIA state ----------------------------------------------------- */
 
@@ -260,7 +259,6 @@ void GTIA_Initialise(void) {
 	for (i = 0; i < 32; i++)
 		GTIA_PutByte((UWORD) i, 0);
 #endif /* !defined(BASIC) && !defined(CURSES_BASIC) */
-  POTENA=0;
 }
 
 #ifdef NEW_CYCLE_EXACT
@@ -577,7 +575,6 @@ void GTIA_PutByte(UWORD addr, UBYTE byte)
 		Update_consol_sound(1);
 #endif
 		consol_mask = (~byte) & 0x0f;
-    POTENA = byte & 0x04;
 		break;
 
 #if defined(BASIC) || defined(CURSES_BASIC)

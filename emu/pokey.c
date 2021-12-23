@@ -96,22 +96,13 @@ UBYTE POKEY_GetByte(UWORD addr)
 		return 0;
 #endif
 	addr &= 0x0f;
+	if (addr < 8) {
+		byte = POT_input[addr];
+		if (byte <= pot_scanline)
+			return byte;
+		return pot_scanline;
+	}
 	switch (addr) {
-	case _POT0:
-	case _POT1:
-	case _POT2:
-	case _POT3:
-	case _POT4:
-	case _POT5:
-	case _POT6:
-	case _POT7:
-    if (!POTENA)
-      return 228;
-		if (POT_input[addr] <= pot_scanline) {
-			return POT_input[addr];
-    }
-    return pot_scanline;
-    break;
 	case _ALLPOT:
 		{
 			unsigned int i;
