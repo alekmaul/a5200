@@ -78,12 +78,19 @@ int mouse_joy_inertia = 10;
 #endif
 
 static UBYTE STICK[4];
-static UBYTE TRIG_input[4];
+static UBYTE TRIG_input[4] = {0};
 
 //static int max_scanline_counter;
 //static int scanline_counter;
 
 void INPUT_Initialise(void) {
+	int i;
+	for (i = 0; i < 4; i++)
+	{
+		PCPOT_input[i << 1]       = JOY_5200_CENTER;
+		PCPOT_input[(i << 1) + 1] = JOY_5200_CENTER;
+		TRIG_input[i]             = 1;
+	}
 }
 
 void INPUT_Frame(void) {
@@ -158,10 +165,11 @@ void INPUT_Frame(void) {
 	STICK[0] = i & 0x0f;
 	STICK[1] = (i >> 4) & 0x0f;
 
-	/* Ignore 4-player support for now... */
-	/*i = Atari_PORT(1);
+	/* We don't support the other two sticks, so this will result
+	 * in both being in the CENTER position... */
+	i = Atari_PORT(1);
 	STICK[2] = i & 0x0f;
-	STICK[3] = (i >> 4) & 0x0f;*/
+	STICK[3] = (i >> 4) & 0x0f;
 
 	for (i = 0; i < 2; i++) {
 		if (STICK[i] != STICK_CENTRE) {
