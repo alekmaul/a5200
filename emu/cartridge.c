@@ -27,7 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <encodings/crc32.h>
+#include <libretro.h>
+#include <string/stdstring.h>
+#include <utils/md5.h>
 
 #include "atari.h"
 #include "binload.h" /* loading_basic */
@@ -40,429 +42,240 @@
 #include "statesav.h"
 #endif
 
-/*
-bd52623b  Defender # A5200.A52
-ce07d9ad  Diagnostic Cart.bin
-6a687f9c  Dig Dug # A5200.A52
-d3bd3221  Final Legacy (Prototype) # A5200.A52
-d3bd3221  FinalLegacy.bin
-04b299a4  Frisky Tom (Prototype) # A5200.A52
-0af19345  Frogger 2 - Threedeep! # A5200.A52
-1062ef6a  Frogger.bin
-0fe438b3  frogger2.bin
-04b299a4  frskytom.bin
-97b15243  Gorf.bin
-cfd4a7f9  Gyruss # A5200.A52
-cfd4a7f9  Gyruss.bin
-18a73af3  H.E.R.O. # A5200.A52
-18a73af3  H.E.R.O. (1984) (Activision).a52
-18a73af3  Hero.a52
-d9ae4518  James Bond 007 # A5200.A52
-d9ae4518  JamesBond007.bin
-bfd30c01  Joust # A5200.A52
-7c30592c  Jr Pac-Man # A5200.A52
-2c676662  Jungle Hunt # A5200.A52
-ecfa624f  Kangaroo # A5200.A52
-02cdfc70  KrazyShootOut.bin
-83517703  Last Starfighter # A5200.A52
-84df4925  Looney Tunes Hotel (Prototype # A5200.A52
-ab8e035b  Meteorites # A5200.A52
-931a454a  MICRGAMN.BIN
-931a454a  Microgammon SB (Prototype) # A5200.A52
-969cfe1a  Millipede # A5200.A52
-7df1adfb  Miner 2049 # A5200.A52
-c597c087  Miniature Golf # A5200.A52
-c597c087  MINIGOLF.BIN
-2a640143  Montezuma's Revenge # A5200.A52
-d0b2f285  Moon Patrol # A5200.A52
-457fb9b3  Mr. Do's Castle.bin
-752f5efd  Ms. Pac-Man # A5200.A52
-59983c40  pacjr52.bin
-8873ef51  Pac-Man # A5200.A52
-e9f826bd  pete.bin
-4b910461  Pitfall 2 - the Lost Caverns # A5200.A52
-4b910461  Pitfall II - The Lost Caverns (1984) (Activision).a52
-abc2d1e4  Pole Position # A5200.A52
-abc2d1e4  PolePosition.bin
-a18a9a40  Popeye # A5200.A52
-3c33f26e  Qbert.bin
-aea6d2c2  QIX # A5200.A52
-b5f3402b  Quest for Quintana Roo # A5200.A52
-4336c2cc  Realsports Football # A5200.A52
-ecbd1853  Realsports Soccer # A5200.A52
-10f33c90  Realsports Tennis # A5200.A52
-0f996184  RealsportsBasketballRev1.bin
-4336c2cc  RealsportsFootball.bin
-10f33c90  RealsportsTennis.bin
-a97606ab  Roadrunner # A5200.A52
-4252abd9  Robotron 2084 # A5200.A52
-b68d61e8  Space Dungeon # A5200.A52
-387365dc  Space Shuttle - a Journey Into Space # A5200.A52
-b68d61e8  SpaceDungeon.bin
-73b5b6fb  Sport Goofy (Prototype) # A5200.A52
-7d819a9f  Star Raiders # A5200.A52
-69f23548  Star Trek - Strategic Operations Simulator # A5200.A52
-75f566df  Star Wars - the Arcade Game # A5200.A52
-1d1cee27  Stargate # A5200.A52
-75f566df  StarWarsArcade.bin
-fd8f0cd4  Super Pac Man Final (5200).bin
-0a4ddb1e  Super Pac-Man (Prototype) # A5200.A52
-1187342f  Tempest (Prototype) # A5200.A52
-1187342f  Tempst52.bin
-0ba22ece  Track and Field # A5200.A52
-d6f7ddfd  Wizard of Wor# A5200.A52
-b8faaec3  Xari Arena (Prototype) # A5200.A52
-b8faaec3  xari52.bin
-12cc298f  yellwsub.bin
-2959d827  Zone Ranger # A5200.A52
-*/
+extern void a5200_log(enum retro_log_level level, const char *format, ...);
 
-static int cart_find_16k_mapping(uint32_t crc)
-{
-	if (crc == 0x35484751 || /* AE                */
-		 crc == 0x9bae58dc || /* Beamrider         */
-		 crc == 0xbe3cd348 || /* Berzerk           */
-		 crc == 0xc8f9c094 || /* Blaster           */
-		 crc == 0x0624E6E7 || /* BluePrint         */
-		 crc == 0x9ad53bbc || /* ChopLifter        */
-		 crc == 0xf43e7cd0 || /* Decathlon         */
-		 crc == 0xd3bd3221 || /* Final Legacy      */
-		 crc == 0x18a73af3 || /* H.E.R.O           */
-		 crc == 0x83517703 || /* Last StarFigtr    */
-		 crc == 0xab8e035b || /* Meteorites        */
-		 crc == 0x969cfe1a || /* Millipede         */
-		 crc == 0x7df1adfb || /* Miner 2049er      */
-		 crc == 0xb8b6a2fd || /* Missle Command+   */
-		 crc == 0xd0b2f285 || /* Moon Patrol       */
-		 crc == 0xe8b130c4 || /* PAM Diags2.0      */
-		 crc == 0x4b910461 || /* Pitfall II        */
-		 crc == 0x47dc1314 || /* Preppie (Conv)    */
-		 crc == 0xF1E21530 || /* Preppie (Conv)    */
-		 crc == 0xb5f3402b || /* Quest Quintana    */
-		 crc == 0x4252abd9 || /* Robotron 2084     */
-		 crc == 0x387365dc || /* Space Shuttle     */
-		 crc == 0x82E2981F || /* Super Pacman      */
-		 crc == 0xFD8F0CD4 || /* Super Pacman      */
-		 crc == 0xa4ddb1e  || /* Super Pacman      */
-		 crc == 0xe80dbb2  || /* Time Runner (Conv) */
-		 crc == 0x0ba22ece || /* Track and Field   */
-		 crc == 0xd6f7ddfd || /* Wizard of Wor     */
-		 crc == 0x2959d827 || /* Zone Ranger       */
-		 crc == 0xB8FAAEC3 || /* Xari arena        */
-		 crc == 0x38F4A6A4   )/* Xmas (Demo)       */
-		return 2;
-
-	/* crc == 0x8d2aaab5 asteroid.bin */
-	/* crc == 0x4019ecec Astro Chase # A5200.A52 */
-	/* crc == 0xb3b8e314 Battlezone */
-	/* crc == 0x04807705 Buck Rogers - Planet of Zoom # A5200.A52 */
-	/* crc == 0x7a9d9f85 boogie.bin */
-	/* crc == 0x536a70fe Centipede # A5200.A52 */
-	/* crc == 0x536a70fe Centipede.bin */
-	/* crc == 0x82b91800 Congo Bongo # A5200.A52 */
-	/* crc == 0x82b91800 CongoBongo.bin */
-	/* crc == 0xfd541c80 Countermeasure # A5200.A52 */
-	/* crc == 0x1187342f Tempest  */
-	return 1;
-}
-
-static int cart_wait_on_type(uint32_t crc)
-{
-	int bRet=1;
-	unsigned int posdeb=2;
-
-	posdeb = cart_find_16k_mapping(crc) == 1 ? 18 : 2;
-
-	bRet = (posdeb == 2 ? 2 : 1);
-
-	return bRet;
-}
-
-int cart_kb[CART_LAST_SUPPORTED + 1] = {
-	    0,
-	    0,//8,  /* CART_STD_8 */
-	    0,//16, /* CART_STD_16 */
-	    0,//16, /* CART_OSS_16 */
-	32, /* CART_5200_32 */
-	    0,//32, /* CART_DB_32 */
-	16, /* CART_5200_EE_16 */
-	40, /* CART_5200_40 */
-	    0,//64, /* CART_WILL_64 */
-	    0,//64, /* CART_EXP_64 */
-	    0,//64, /* CART_DIAMOND_64 */
-	    0,//64, /* CART_SDX */
-	    0,//32, /* CART_XEGS_32 */
-	    0,//64, /* CART_XEGS_64 */
-	    0,//128,/* CART_XEGS_128 */
-	    0,//16, /* CART_OSS2_16 */
-	16, /* CART_5200_NS_16 */
-	    0,//128,/* CART_ATRAX_128 */
-	    0,//40, /* CART_BBSB_40 */
-	8,  /* CART_5200_8 */
-	4,  /* CART_5200_4 */
-	    0,//8,  /* CART_RIGHT_8 */
-	    0,//32, /* CART_WILL_32 */
-	    0,//256,/* CART_XEGS_256 */
-	    0,//512,/* CART_XEGS_512 */
-	0,//1024,/* CART_XEGS_1024 */
-	0,//16, /* CART_MEGA_16 */
-	0,//32, /* CART_MEGA_32 */
-	0,//64, /* CART_MEGA_64 */
-	0,//128,/* CART_MEGA_128 */
-	0,//256,/* CART_MEGA_256 */
-	0,//512,/* CART_MEGA_512 */
-	0,//1024,/* CART_MEGA_1024 */
-	0,//32, /* CART_SWXEGS_32 */
-	0,//64, /* CART_SWXEGS_64 */
-	0,//128,/* CART_SWXEGS_128 */
-	0,//256,/* CART_SWXEGS_256 */
-	0,//512,/* CART_SWXEGS_512 */
-	0,//1024,/* CART_SWXEGS_1024 */
-	0,//8,  /* CART_PHOENIX_8 */
-	0,//16, /* CART_BLIZZARD_16 */
-	0,//128,/* CART_ATMAX_128 */
-	0,//1024 /* CART_ATMAX_1024 */
+static const struct cart_info_t cart_info_none = {
+	"",
+	CART_NONE,
+	1
 };
 
-int CART_IsFor5200(int type)
-{
-	switch (type) {
-	case CART_5200_32:
-	case CART_5200_EE_16:
-	case CART_5200_40:
-	case CART_5200_NS_16:
-	case CART_5200_8:
-	case CART_5200_4:
-		return TRUE;
-	default:
-		break;
-	}
-	return FALSE;
-}
+static const struct cart_info_t cart_info_table[] = {
+	{ "72a91c53bfaa558d863610e3e6d50213", CART_5200_NS_16, 1, "Ant Eater.a52" },
+	{ "c8e90376b7e1b00dcbd4042f50bffb75", CART_5200_NS_16, 1, "Atari 5200 Calibration Cart" },
+	{ "45f8841269313736489180c8ec3e9588", CART_5200_NS_16, 1, "Activision Decathlon, The (USA).a52" },
+	{ "4b1aecab0e2f9c90e514cb0a506e3a5f", CART_5200_32,    1, "Adventure II-a.a52" },
+	{ "e2f6085028eb8cf24ad7b50ca4ef640f", CART_5200_32,    1, "Adventure II-b.a52" },
+	{ "b48dd725b5d024ef0a5a797fb5acefc6", CART_5200_32,    1, "Alien Swarm (XL Conversion).a52" },
+	{ "9e6d04dc20cbd6d3cdb722e420dea203", CART_5200_32,    1, "ANALOG Multicart (XL Conversion).a52" },
+	{ "737717ff4f8402ed5b02e4bf866bbbe3", CART_5200_32,    1, "ANALOG Multicart V2 (XL Conversion).a52" },
+	{ "77c6b647746bb1413c5566378ef25eec", CART_5200_32,    1, "Archon (XL Conversion).a52" },
+	{ "bae7c1e5eb04e19ef8d0d0b5ce134332", CART_5200_EE_16, 1, "Astro Chase (USA).a52" },
+	{ "10cdf2bbb058bb4cc518fd25031f427d", CART_5200_32,    1, "Astro Grover (XL Conversion).a52" },
+	{ "d31a3bbb4c99f539f0d2c4e02bec516e", CART_5200_32,    1, "Atlantis (XL Conversion).a52" },
+	{ "ec65389cc604b279d69a889725c723e7", CART_5200_32,    1, "Attack of the Mutant Camels (XL Conversion).a52" },
+	{ "f5cd178cbea0ae7d8cf65b30cfd04225", CART_5200_32,    1, "Ballblazer (USA).a52" },
+	{ "8576867c2cfc965cf152be0468f684a7", CART_5200_EE_16, 1, "Battlezone (1983) (Atari) (Prototype).bin" },
+	{ "96b424d0bb0339f4edfe8095fe275d62", CART_5200_32,    1, "Batty Builders (XL Conversion).a52" },
+	{ "8123393ae9635f6bc15ddc3380b04328", CART_5200_NS_16, 1, "Blueprint (1982) (CBS).a52" },
+	{ "17e5c03b4fcada48d4c2529afcfe3a70", CART_5200_32,    1, "BCs Quest For Tires (XL Conversion).a52" },
+	{ "96ec5b299b203c88f98100b57af6838d", CART_5200_32,    1, "Biscuits From Hell.bin" },
+	{ "315e0bb45f28bb227e92b8c9e00ee8eb", CART_5200_32,    1, "Blaster.a52" },
+	{ "992f62ccfda4c92ef113af1dd96d8f55", CART_5200_NS_16, 1, "BlowSub.a52" },
+	{ "1913310b1e44ad7f3b90aeb16790a850", CART_5200_NS_16, 1, "Beamrider (USA).a52" },
+	{ "f8973db8dc272c2e5eb7b8dbb5c0cc3b", CART_5200_NS_16, 1, "BerZerk (USA).a52" },
+	{ "139229eed18032fdea735fa5360bd551", CART_5200_32,    1, "Beef Drop Ultimate SD Edition.a52" },
+	{ "81790daff7f7646a6c371c056622be9c", CART_5200_40,    1, "Bounty Bob Strikes Back (Merged) (Big Five Software) (U).a52" },
+	{ "a074a1ff0a16d1e034ee314b85fa41e9", CART_5200_EE_16, 1, "Buck Rogers - Planet of Zoom (USA).a52" },
+	{ "713feccd8f2722f2e9bdcab98e25a35f", CART_5200_32,    1, "Buried Bucks (XL Conversion).a52" },
+	{ "3147ad22f8d5f46b1ef40a39da3a3de1", CART_5200_32,    1, "Captain Beeble (XL Conversion).a52" },
+	{ "79335deb06a1ef532fea8eee8012ecde", CART_5200_NS_16, 1, "Capture the Flag.a52" },
+	{ "01b978c3faf5d516f300f98c00377532", CART_5200_8,     1, "Carol Shaw's River Raid (USA).a52" },
+	{ "4965b4c8acca64c4fac39a7c0763f611", CART_5200_32,    1, "Castle Blast (USA) (Unl).a52" },
+	{ "8f4c07a9e0ef2ded720b403810220aaf", CART_5200_32,    1, "Castle Crisis (USA) (Unl).a52" },
+	{ "d64a175672b6dba0c0b244c949799e64", CART_5200_32,    1, "Caverns of Mars (Conv).a52" },
+	{ "1db260d6769bed6bf4731744213097b8", CART_5200_NS_16, 1, "Caverns Of Mars 2 (Conv).a52" },
+	{ "c4a14a88a4257970223b1ef9bf95da5b", CART_5200_NS_16, 1, "Caverns Of Mars 3 (Conv).a52" },
+	{ "261702e8d9acbf45d44bb61fd8fa3e17", CART_5200_EE_16, 1, "Centipede (USA).a52" },
+	{ "df283efab9d36a15603283ee2a7bdb71", CART_5200_32,    1, "Chess (XL Conversion).a52" },
+	{ "21b722b9c93076a3605ec157ac3aa4b8", CART_5200_32,    1, "Chop Suey.a52" },
+	{ "3ff7707e25359c9bcb2326a5d8539852", CART_5200_NS_16, 1, "Choplifter! (USA).a52" },
+	{ "701dd2903b55a5b6734afa120e141334", CART_5200_32,    1, "Chicken (XL Conversion).a52" },
+	{ "e60a98edcc5cad98170772ea8d8c118d", CART_5200_32,    1, "Claim Jumper (XL Conversion).a52" },
+	{ "f21a0fb1653215bbeea87dd80249015e", CART_5200_NS_16, 1, "Claim Jumper (XL Converion Alternate).a52" },
+	{ "4a754460e43bebd08b943c8dba31d581", CART_5200_32,    1, "Clowns & Balloons (XL Conversion).a52" },
+	{ "dc382809b4ba707d8a9084421c7a4976", CART_5200_NS_16, 1, "Cloudburst.a52" },
+	{ "5720423ebd7575941a1586466ba9beaf", CART_5200_EE_16, 1, "Congo Bongo (USA).a52" },
+	{ "88ea120ef17747d7b567ffa08b9fb578", CART_5200_EE_16, 1, "Congo Bongo (1983) (Sega).bin" },
+	{ "1a64edff521608f9f4fa9d7bdb355087", CART_5200_EE_16, 1, "Countermeasure (USA).a52" },
+	{ "4c034f3db0489726abd401550a402c32", CART_5200_32,    1, "COSMI (XL Conversion).a52" },
+	{ "195c23a894c7ac8631757eec661ab1e6", CART_5200_32,    1, "Crossfire (XL Conversion).a52" },
+	{ "cd64cc0b348a634080078206e3111f9a", CART_5200_32,    1, "Crystal Castles (Final Conversion).a52" },
+	{ "c24be906c9d79f4eab391fd583332a4c", CART_5200_32,    1, "Curse of the Lost Miner.a52" },
+	{ "7c27d225a13e178610babf331a0759c0", CART_5200_NS_16, 1, "David Crane's Pitfall II - Lost Caverns (USA).a52" },
+	{ "27d5f32b0d46d3d80773a2b505f95046", CART_5200_EE_16, 1, "Defender (1982) (Atari).a52" },
+	{ "8e280ad05824ef4ca32700716ef8e69a", CART_5200_NS_16, 1, "Deluxe Invaders.a52" },
+	{ "b4af8b555278dec6e2c2329881dc0a15", CART_5200_32,    1, "Demon Attack (XL Conversion).a52" },
+	{ "32b2bb28213dbb01b69e003c4b35bb57", CART_5200_32,    1, "Desmonds Dungeon (XL Conversion).a52" },
+	{ "6049d5ef7eddb1bb3a643151ff506219", CART_5200_32,    1, "Diamond Mine (XL Conversion).a52" },
+	{ "3abd0c057474bad46e45f3d4e96eecee", CART_5200_EE_16, 1, "Dig Dug (1983) (Atari).a52" },
+	{ "1d1eab4067fc0aaf2b2b880fb8f72e40", CART_5200_32,    1, "Donkey Kong Arcade.a52" },
+	{ "4dcca2e6a88d57e54bc7b2377cc2e5b5", CART_5200_32,    1, "Donkey Kong Jr Enhanded.a52" },
+	{ "0c393d2b04afae8a8f8827d30794b29a", CART_5200_32,    1, "Donkey Kong (XL Conversion).a52" },
+	{ "ae5b9bbe91983ab111fd7cf3d29d6b11", CART_5200_32,    1, "Donkey Kong Jr (XL Conversion).a52" },
+	{ "159ccaa564fc2472afd1f06665ec6d19", CART_5200_8,     1, "Dreadnaught Factor, The (USA).a52" },
+	{ "b7fafc8ae6bb0801e53d5756b14dbe31", CART_5200_NS_16, 1, "Drelbs.a52" },
+	{ "e9b7d19c573a30e6503f35c886666358", CART_5200_32,    1, "Encounter.a52" },
+	{ "7259353c39aadf76f2eb284e7666bb58", CART_5200_32,    1, "ET (32k).a52" },
+	{ "5789a45479d9769d4662a15f349d83ed", CART_5200_32,    1, "Fairy Force (homebrew).a52" },
+	{ "4b6c878758f4d4de7f9650296db76d2e", CART_5200_32,    1, "Fast Eddie (XL Conversion).a52" },
+	{ "5cf2837752ef8dfa3a6962a28fc0077b", CART_5200_8,     1, "Falcon (XL Conversion).a52" },
+	{ "6b58f0f3175a2d6796c35afafe6b245d", CART_5200_8,     1, "Floyd The Droid (XL Conversion).a52" },
+	{ "14bd9a0423eafc3090333af916cfbce6", CART_5200_EE_16, 1, "Frisky Tom (USA) (Proto).a52" },
+	{ "c717ebc92233d206f262d15258e3184d", CART_5200_EE_16, 1, "Frisky Tom (USA) (Hack).a52" },
+	{ "05a086fe4cc3ad16d39c3bc45eb9c26f", CART_5200_32,    1, "Fort Apocalypse (XL Conversion).a52" },
+	{ "2c89c9444f99fd7ac83f88278e6772c6", CART_5200_8,     1, "Frogger (1983) (Parker Bros).a52" },
+	{ "d8636222c993ca71ca0904c8d89c4411", CART_5200_EE_16, 1, "Frogger II - Threeedeep! (USA).a52" },
+	{ "98113c00a7c82c83ee893d8e9352aa7a", CART_5200_8,     1, "Galactic_Chase.a52" },
+	{ "3ace7c591a88af22bac0c559bbb08f03", CART_5200_8,     1, "Galaxian (1982) (Atari).a52" },
+	{ "4012282da62c0d72300294447ef6b9a2", CART_5200_32,    1, "Gateway to Apshai (XL Conversion).a52" },
+	{ "0fdce0dd4014f3188d0ca289f53387d0", CART_5200_32,    1, "Gebelli (XL Conversion).a52" },
+	{ "85fe2492e2945015000272a9fefc06e3", CART_5200_8,     1, "Gorf (1982) (CBS).a52" },
+	{ "a21c545a52d488bfdaf078d786bf4916", CART_5200_32,    1, "Gorf Converted (1982) (CBS).a52" },
+	{ "dc271e475b4766e80151f1da5b764e52", CART_5200_32,    1, "Gremlins (USA).a52" },
+	{ "dacc0a82e8ee0c086971f9d9bac14127", CART_5200_EE_16, 1, "Gyruss (USA).a52" },
+	{ "b7617ac90462ef13f8350e32b8198873", CART_5200_EE_16, 1, "Gyruss (Autofire Hack).a52" },
+	{ "f8f0e0a6dc2ffee41b2a2dd736cba4cd", CART_5200_NS_16, 1, "H.E.R.O. (USA).a52" },
+	{ "3491fa368ae42766a83a43a627496c41", CART_5200_EE_16, 1, "Hangly Pollux.a52" },
+	{ "0f6407d83115a78a182f323e5ef76384", CART_5200_NS_16, 1, "Heavy Metal.a52" },
+	{ "0c25803c9175487afce0c9d636133dc1", CART_5200_32,    1, "Hyperblast! (XL Conversion).a52" },
+	{ "d824f6ee24f8bc412468268395a76159", CART_5200_32,    1, "Ixion (XL Conversion).a52" },
+	{ "936db7c08e6b4b902c585a529cb15fc5", CART_5200_EE_16, 1, "James Bond 007 (USA).a52" },
+	{ "082846d3a43aab4672fe98252eb1b6f9", CART_5200_32,    1, "Jawbreaker (XL Conversion).a52" },
+	{ "25cfdef5bf9b126166d5394ae74a32e7", CART_5200_EE_16, 1, "Joust (USA).a52" },
+	{ "bc748804f35728e98847da6cdaf241a7", CART_5200_EE_16, 1, "Jr. Pac-Man (USA) (Proto).a52" },
+	{ "40f3fca978058da46cd3e63ea8d2412f", CART_5200_EE_16, 1, "Jr Pac-Man (1984) (Atari) (U).a52" },
+	{ "a0d407ab5f0c63e1e17604682894d1a9", CART_5200_32,    1, "Jumpman Jr (Conv).a52" },
+	{ "27140302a715694401319568a83971a1", CART_5200_32,    1, "Jumpman Jr (XL Conversion).a52" },
+	{ "1a6ccf1152d2bcebd16f0989b8257108", CART_5200_32,    1, "Jumpman Jr (XL Conversion).a52" },
+	{ "834067fdce5d09b86741e41e7e491d6c", CART_5200_EE_16, 1, "Jungle Hunt (USA).a52" },
+	{ "9584d143be1871241e4a0d038e8e1468", CART_5200_32,    1, "Juno First (XL Conversion).a52" },
+	{ "92fd2f43bc0adf2f704666b5244fadf1", CART_5200_4,     1, "Kaboom! (USA).a52" },
+	{ "796d2c22f8205fb0ce8f1ee67c8eb2ca", CART_5200_EE_16, 1, "Kangaroo (USA).a52" },
+	{ "f25a084754ea4d37c2fb1dc8ca6dc51b", CART_5200_8,     1, "Keystone Kapers (USA).a52" },
+	{ "3b03e3cda8e8aa3beed4c9617010b010", CART_5200_32,    1, "Koffi - Yellow Kopter (USA) (Unl).a52" },
+	{ "03d0d59c5382b0a34a158e74e9bfce58", CART_5200_8,     1, "Kid Grid.a52" },
+	{ "b99f405de8e7700619bcd18524ba0e0e", CART_5200_8,     1, "K-Razy Shoot-Out (USA).a52" },
+	{ "66977296ff8c095b8cb755de3472b821", CART_5200_8,     1, "K-Razy Shoot-Out (1982) (CBS) [h1] (Two Port).a52" },
+	{ "5154dc468c00e5a343f5a8843a14f8ce", CART_5200_32,    1, "K-Star Patrol (XL Conversion).a52" },
+	{ "c4931be078e2b16dc45e9537ebce836b", CART_5200_32,    1, "Laser Gates (Conversion).a52" },
+	{ "46264c86edf30666e28553bd08369b83", CART_5200_NS_16, 1, "Last Starfighter, The (USA) (Proto).a52" },
+	{ "d0a1654625dbdf3c6b8480c1ed17137f", CART_5200_EE_16, 1, "Looney Tunes Hotel (1983) (Atari) (Prototype).a52" },
+	{ "ff785ce12ad6f4ca67f662598025c367", CART_5200_8,     1, "Megamania (1983) (Activision).a52" },
+	{ "8311263811e366bf5ef07977d0f5a5ae", CART_5200_32,    1, "MajorBlink_5200_V2 (XL Conversion).a52" },
+	{ "d00dff571bfa57c7ff7880c3ce03b178", CART_5200_32,    1, "Mario Brothers (1983) (Atari).a52" },
+	{ "1cd67468d123219201702eadaffd0275", CART_5200_NS_16, 1, "Meteorites (USA).a52" },
+	{ "bc33c07415b42646cc813845b979d85a", CART_5200_32,    1, "Meebzork (1983) (Atari).a52" },
+	{ "24348dd9287f54574ccc40ee40d24a86", CART_5200_EE_16, 1, "Microgammon SB (1983) (Atari) (Prototype).a52" },
+	{ "84d88bcdeffee1ab880a5575c6aca45e", CART_5200_NS_16, 0, "Millipede (USA) (Proto).a52" },
+	{ "d859bff796625e980db1840f15dec4b5", CART_5200_NS_16, 1, "Miner 2049er Starring Bounty Bob (USA).a52" },
+	{ "69d472a79f404e49ad2278df3c8a266e", CART_5200_EE_16, 0, "Miniature Golf (1983) (Atari).a52" },
+	{ "972b6c0dbf5501cacfdc6665e86a796c", CART_5200_8,     1, "Missile Command (USA).a52" },
+	{ "3090673bd3f8c04a92e391bf5540b88b", CART_5200_32,    1, "MC+final.a52" },
+	{ "694897cc0d98fcf2f59eef788881f67d", CART_5200_EE_16, 1, "Montezuma's Revenge featuring Panama Joe (USA).a52" },
+	{ "296e5a3a9efd4f89531e9cf0259c903d", CART_5200_NS_16, 1, "Moon Patrol (USA).a52" },
+	{ "2d8e6aa095bf2aee75406ade8b035a50", CART_5200_NS_16, 1, "Moon Patrol Sprite Hack (USA).a52" },
+	{ "627dbb2f84daef11229a165a69d84e09", CART_5200_32,    1, "Moon Patrol Redux.a52" },
+	{ "618e3eb7ae2810768e1aefed1bfdcec4", CART_5200_8,     1, "Mountain King (USA).a52" },
+	{ "23296829e0e1316541aa6b5540b9ba2e", CART_5200_8,     1, "Mountain King (1984) (Sunrise Software) [h1] (Two Port).a52" },
+	{ "fc3ab610323cc34e7984f4bd599b871f", CART_5200_32,    1, "Mr Cool (XL Conversion).a52" },
+	{ "d1873645fee21e84b25dc5e939d93e9b", CART_5200_8,     1, "Mr. Do!'s Castle (USA).a52" },
+	{ "ef9a920ffdf592546499738ee911fc1e", CART_5200_EE_16, 1, "Ms. Pac-Man (USA).a52" },
+	{ "8341c9a660280292664bcaccd1bc5279", CART_5200_32,    1, "Necromancer.a52" },
+	{ "6c661ed6f14d635482f1d35c5249c788", CART_5200_32,    1, "Oils Well (XL Conversion).a52" },
+	{ "5781071d4e3760dd7cd46e1061a32046", CART_5200_32,    1, "O'Riley's Mine (XL Conversion).a52" },
+	{ "f1a4d62d9ba965335fa13354a6264623", CART_5200_EE_16, 1, "Pac-Man (USA).a52" },
+	{ "e24490c20bf79c933e50c11a89018960", CART_5200_32,    1, "Pac-Man (Fixed Munch V2).a52" },
+	{ "43e9af8d8c648515de46b9f4bcd024d7", CART_5200_32,    1, "Pacific Coast Hwy (XL Conversion).a52" },
+	{ "57c5b010ec9b5f6313e691bdda94e185", CART_5200_32,    0, "Pastfinder (XL Conversion).a52" },
+	{ "a301a449fc20ad345b04932d3ca3ef54", CART_5200_32,    1, "Pengo (USA).a52" },
+	{ "b9e727eaef3463d5979ec06fc5bd5048", CART_5200_NS_16, 1, "Pinhead.a52" },
+	{ "ecbd6dd2ab105dd43f98476966bbf26c", CART_5200_8,     1, "Pitfall! (USA).a52 (use classics fix instead)" },
+	{ "2be3529c33fdf6b76fa7528ba43cdd7f", CART_5200_32,    1, "Pitfall (classics fix).a52" },
+	{ "e600c16c2b1f063ffb3f96caf4d23235", CART_5200_32,    1, "Pitstop (XL Conversion).a52" },
+	{ "9e296c2817cbe1671005cf4dfebe8721", CART_5200_32,    1, "Protector II (XL Conversion).a52" },
+	{ "fd0cbea6ad18194be0538844e3d7fdc9", CART_5200_EE_16, 1, "Pole Position (USA).a52" },
+	{ "c3fc21b6fa55c0473b8347d0e2d2bee0", CART_5200_32,    1, "Pooyan.a52" },
+	{ "dd4ae6add63452aafe7d4fa752cd78ca", CART_5200_EE_16, 1, "Popeye (USA).a52" },
+	{ "66057fd4b37be2a45bd8c8e6aa12498d", CART_5200_32,    1, "Popeye Arcade Final (Hack).a52" },
+	{ "894959d9c5a88c8e1744f7fcbb930065", CART_5200_32,    1, "Preppie (XL Conversion).a52" },
+	{ "ccd35e9ea3b3c5824214d88a6d8d8f7e", CART_5200_8,     1, "Pete's Diagnostics (1982) (Atari).a52" },
+	{ "7830f985faa701bdec47a023b5953cfe", CART_5200_32,    0, "Pool (XL Conversion).a52" },
+	{ "ce44d14341fcc5e7e4fb7a04f77ffec9", CART_5200_8,     1, "Q-bert (USA).a52" },
+	{ "9b7d9d874a93332582f34d1420e0f574", CART_5200_EE_16, 1, "QIX (USA).a52" },
+	{ "099706cedd068aced7313ffa371d7ec3", CART_5200_NS_16, 0, "Quest for Quintana Roo (USA).a52" },
+	{ "80e0ad043da9a7564fec75c1346dbc6e", CART_5200_NS_16, 1, "RainbowWalker.a52" },
+	{ "150ff18392c270001f10e7934b2af546", CART_5200_32,    1, "Rally (XL Conversion).a52" },
+	{ "88fa71fc34e81e616bdffc30e013330b", CART_5200_32,    1, "Ratcatcher.a52" },
+	{ "2bb928d7516e451c6b0159ac413407de", CART_5200_32,    1, "RealSports Baseball (USA).a52" },
+	{ "e056001d304db597bdd21b2968fcc3e6", CART_5200_32,    1, "RealSports Basketball (USA).a52" },
+	{ "022c47b525b058796841134bb5c75a18", CART_5200_EE_16, 1, "RealSports Football (USA).a52" },
+	{ "3074fad290298d56c67f82e8588c5a8b", CART_5200_EE_16, 1, "RealSports Soccer (USA).a52" },
+	{ "7e683e571cbe7c77f76a1648f906b932", CART_5200_EE_16, 1, "RealSports Tennis (USA).a52" },
+	{ "0dc44c5bf0829649b7fec37cb0a8186b", CART_5200_32,    1, "Rescue on Fractalus! (USA).a52" },
+	{ "ddf7834a420f1eaae20a7a6255f80a99", CART_5200_EE_16, 1, "Road Runner (USA) (Proto).a52" },
+	{ "86b358c9bca97c2089b929e3b2751908", CART_5200_32,    1, "Rockball 5200.a52" },
+	{ "5dba5b478b7da9fd2c617e41fb5ccd31", CART_5200_NS_16, 1, "Robotron 2084 (USA).a52" },
+	{ "b8cbc918cf2bc81f941719b874f13fcb", CART_5200_32,    1, "Runner5200.a52" },
+	{ "950aa1075eaf4ee2b2c2cfcf8f6c25b4", CART_5200_32,    1, "Satans Hollow (Conv).a52" },
+	{ "b610a576cbf26a259da4ec5e38c33f09", CART_5200_NS_16, 1, "Savage Pond (XL Conversion).a52" },
+	{ "467e72c97db63eb59011dd062c965ec9", CART_5200_32,    1, "Scramble.a52" },
+	{ "3748e136c451471cdf58c94b251d925f", CART_5200_NS_16, 1, "Sea Chase.a52" },
+	{ "1aadd70705d84299085845989ec614ef", CART_5200_NS_16, 1, "Sea Dragon.a52" },
+	{ "54aa9130fa0a50ab8a74ed5b9076ff81", CART_5200_32,    1, "Shamus (XL Conversion).a52" },
+	{ "37ec5b9d35ae681934698fea36e99aba", CART_5200_32,    1, "Shamus Case II (XL Conversion).a52" },
+	{ "be75afc33f5da12974900317d824f9b9", CART_5200_32,    1, "Sinistar.a52" },
+	{ "6151575ffb5ceddd26173f709336776b", CART_5200_32,    1, "Slime (XL Conversion).a52" },
+	{ "6e24e3519458c5cb95a7fd7711131f8d", CART_5200_EE_16, 1, "Space Dungeon (USA).a52" },
+	{ "58430368d2c9190083f95ce923f4c996", CART_5200_8,     1, "Space Invaders (USA).a52" },
+	{ "802a11dfcba6229cc2f93f0f3aaeb3aa", CART_5200_NS_16, 1, "Space Shuttle - A Journey Into Space (USA).a52" },
+	{ "88d286e4b5fbbe7fd1694d98af9ef538", CART_5200_32,    1, "SpeedAce5200.a52" },
+	{ "cd1c3f732c3432c4a642732182b1ea30", CART_5200_32,    1, "Spitfire (1984) (Atari) (Prototype).a52" },
+	{ "221d943b1043f5bdf2b0f25282183404", CART_5200_32,    1, "Spitfire (Prototype).bin" },
+	{ "993e3be7199ece5c3e03092e3b3c0d1d", CART_5200_EE_16, 1, "Sport Goofy (1983) (Atari) (Prototype).a52" },
+	{ "6208110dc3c0bf7b15b33246f2971b6e", CART_5200_32,    1, "Spy Hunter (XL Conversion).a52" },
+	{ "595703dc459cd51fed6e2a191c462969", CART_5200_EE_16, 1, "Stargate (1984) (Atari).a52" },
+	{ "8378e0f92e9365a6ad42efc9b973724a", CART_5200_NS_16, 1, "Star Island.a52" },
+	{ "e2d3a3e52bb4e3f7e489acd9974d68e2", CART_5200_EE_16, 0, "Star Raiders (USA).a52" },
+	{ "0fe34d98a055312aba9ea3cb82d3ee2a", CART_5200_32,    0, "Star Raiders 5200(shield2-02)(32K).a52" },
+	{ "feacc7a44f9e92d245b2cb2485b48bb6", CART_5200_NS_16, 1, "Star Rider.a52" },
+	{ "c959b65be720a03b5479650a3af5a511", CART_5200_EE_16, 1, "Star Trek - Strategic Operations Simulator (USA).a52" },
+	{ "00beaa8405c7fb90d86be5bb1b01ea66", CART_5200_EE_16, 1, "Star Wars - The Arcade Game (USA).a52" },
+	{ "a2831487ab0b0b647aa590fb2b834dd9", CART_5200_8,     1, "Star Wars - ROTJ - Death Star Battle (1983) (Parker Bros).a52" },
+	{ "865570ff9052c1704f673e6222192336", CART_5200_4,     1, "Super Breakout (USA).a52" },
+	{ "dfcd77aec94b532728c3d1fef1da9d85", CART_5200_8,     1, "Super Cobra (USA).a52" },
+	{ "d89669f026c34de7f0da2bcb75356e27", CART_5200_EE_16, 1, "Super Pac Man Final (5200).a52" },
+	{ "1569b7869bf9e46abd2c991c3b90caa6", CART_5200_NS_16, 1, "Superfly (XL Conversion).a52" },
+	{ "c098a0ce6c7e059264511e650ce47b35", CART_5200_32,    1, "Tapper (XL Conversion).a52" },
+	{ "496b6a002bc7d749c02014f7ec6c303c", CART_5200_NS_16, 1, "Tempest (1983) (Atari) (Prototype) [!].a52" },
+	{ "6836a07ea7b2a4c071e9e86c5695b4a1", CART_5200_32,    1, "Timeslip_5200 (XL Conversion).a52" },
+	{ "bb3761de48d39218744d7dbb94553528", CART_5200_NS_16, 1, "Time Runner (XL Conversion).a52" },
+	{ "3f4d175927f891642e5c9f8a197c7d89", CART_5200_32,    1, "Time Runner 32k (BIOS Patched).a52" },
+	{ "bf4f25d64b364dd53fbd63562ea1bcda", CART_5200_32,    1, "Turmoil (XL Conversion).a52" },
+	{ "ae76668cf509a13872ccd874ac47206b", CART_5200_32,    1, "Tutankahman.a52" },
+	{ "3649bfd2008161b9825f386dbaff88da", CART_5200_32,    0, "Up'n Down (XL Conversion).a52" },
+	{ "556a66d6737f0f793821e702547bc051", CART_5200_32,    1, "Vanguard (USA).a52" },
+	{ "560b68b7f83077444a57ebe9f932905a", CART_5200_NS_16, 1, "Wizard of Wor (USA).a52" },
+	{ "8e2ac7b944c30af9fae5f10c3a40f7a4", CART_5200_32,    1, "Worm War I (XL Conversion).a52" },
+	{ "677e4fd5bba70f5983d2c2bbfba36b7e", CART_5200_32,    0, "Xagon (XL Conversion).a52" },
+	{ "4f6c58c28c41f31e3a1515fe1e5d15af", CART_5200_EE_16, 1, "Xari Arena (USA) (Proto).a52" },
+	{ "f35f9e5699079e2634c4bfed0c5ef2f0", CART_5200_8,     1, "Yars Strike (XL Conversion).a52" },
+	{ "9fee054e7d4ba2392f4ba0cb73fc99a5", CART_5200_32,    1, "Zaxxon (USA).a52" },
+	{ "433d3a2fc9896aa8294271a0204dc7e3", CART_5200_32,    1, "Zaxxon 32k_final.a52" },
+	{ "77beee345b4647563e20fd896231bd47", CART_5200_8,     1, "Zenji (USA).a52" },
+	{ "dc45af8b0996cb6a94188b0be3be2e17", CART_5200_NS_16, 1, "Zone Ranger (USA).a52" },
+	{ "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", CART_NONE,       1, "NONE" },
+};
 
 /* For cartridge memory */
 const UBYTE *cart_image = NULL;
-/* Holds a 'backup' reference to the cartridge
- * memory provided by the platform host, to enable
- * reinsertion on load state */
-static const uint8_t *platform_cart_image = NULL;
-static size_t platform_cart_size = 0;
-//LUDO: int cart_type = CART_NONE;
-int cart_type = CART_5200_32;
-
-static int bank;
-
-/* DB_32, XEGS_32, XEGS_64, XEGS_128, XEGS_256, XEGS_512, XEGS_1024 */
-/* SWXEGS_32, SWXEGS_64, SWXEGS_128, SWXEGS_256, SWXEGS_512, SWXEGS_1024 */
-static void set_bank_809F(int b, int main)
-{
-	if (b != bank) {
-		if (b & 0x80) {
-			Cart809F_Disable();
-			CartA0BF_Disable();
-		}
-		else {
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image + b * 0x2000);
-			if (bank & 0x80)
-				CopyROM(0xa000, 0xbfff, cart_image + main);
-		}
-		bank = b;
-	}
-}
-
-/* OSS_16, OSS2_16 */
-static void set_bank_A0AF(int b, int main)
-{
-	if (b != bank) {
-		if (b < 0)
-			CartA0BF_Disable();
-		else {
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xafff, cart_image + b * 0x1000);
-			if (bank < 0)
-				CopyROM(0xb000, 0xbfff, cart_image + main);
-		}
-		bank = b;
-	}
-}
-
-/* EXP_64, DIAMOND_64, SDX_64 */
-static void set_bank_A0BF(int b)
-{
-	if (b != bank) {
-		if (b & 0x0008)
-			CartA0BF_Disable();
-		else {
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image + (~b & 7) * 0x2000);
-		}
-		bank = b;
-	}
-}
-
-static void set_bank_A0BF_WILL64(int b)
-{
-	if (b != bank) {
-		if (b & 0x0008)
-			CartA0BF_Disable();
-		else {
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image + (b & 7) * 0x2000);
-		}
-		bank = b;
-	}
-}
-
-static void set_bank_A0BF_WILL32(int b)
-{
-	if (b != bank) {
-		if (b & 0x0008)
-			CartA0BF_Disable();
-		else {
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image + (b & 3) * 0x2000);
-		}
-		bank = b;
-	}
-}
-
-static void set_bank_A0BF_ATMAX128(int b)
-{
-	if (b != bank) {
-		if (b >= 0x20)
-			return;
-		else if (b >= 0x10)
-			CartA0BF_Disable();
-		else {
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image + b * 0x2000);
-		}
-		bank = b;
-	}
-}
-
-static void set_bank_A0BF_ATMAX1024(int b)
-{
-	if (b != bank) {
-		if (b >= 0x80)
-			CartA0BF_Disable();
-		else {
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image + b * 0x2000);
-		}
-		bank = b;
-	}
-}
-
-static void set_bank_80BF(int b)
-{
-	if (b != bank) {
-		if (b & 0x80) {
-			Cart809F_Disable();
-			CartA0BF_Disable();
-		}
-		else {
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0xbfff, cart_image + b * 0x4000);
-		}
-		bank = b;
-	}
-}
-
-/* an access (read or write) to D500-D5FF area */
-static void CART_Access(UWORD addr)
-{
-	int b = bank;
-	switch (cart_type) {
-	case CART_OSS_16:
-		if (addr & 0x08)
-			b = -1;
-		else
-			switch (addr & 0x07) {
-			case 0x00:
-			case 0x01:
-				b = 0;
-				break;
-			case 0x03:
-			case 0x07:
-				b = 1;
-				break;
-			case 0x04:
-			case 0x05:
-				b = 2;
-				break;
-			/* case 0x02:
-			case 0x06: */
-			default:
-				break;
-			}
-		set_bank_A0AF(b, 0x3000);
-		break;
-	case CART_DB_32:
-		set_bank_809F(addr & 0x03, 0x6000);
-		break;
-	case CART_WILL_64:
-		set_bank_A0BF_WILL64(addr);
-		break;
-	case CART_WILL_32:
-		set_bank_A0BF_WILL32(addr);
-		break;
-	case CART_EXP_64:
-		if ((addr & 0xf0) == 0x70)
-			set_bank_A0BF(addr);
-		break;
-	case CART_DIAMOND_64:
-		if ((addr & 0xf0) == 0xd0)
-			set_bank_A0BF(addr);
-		break;
-	case CART_SDX_64:
-		if ((addr & 0xf0) == 0xe0)
-			set_bank_A0BF(addr);
-		break;
-	case CART_OSS2_16:
-		switch (addr & 0x09) {
-		case 0x00:
-			b = 1;
-			break;
-		case 0x01:
-			b = 3;
-			break;
-		case 0x08:
-			b = -1;
-			break;
-		case 0x09:
-			b = 2;
-			break;
-		}
-		set_bank_A0AF(b, 0x0000);
-		break;
-	case CART_PHOENIX_8:
-		CartA0BF_Disable();
-		break;
-	case CART_BLIZZARD_16:
-		Cart809F_Disable();
-		CartA0BF_Disable();
-		break;
-	case CART_ATMAX_128:
-		set_bank_A0BF_ATMAX128(addr & 0xff);
-		break;
-	case CART_ATMAX_1024:
-		set_bank_A0BF_ATMAX1024(addr & 0xff);
-		break;
-	default:
-		break;
-	}
-}
+struct cart_info_t cart_info = {0};
 
 /* a read from D500-D5FF area */
 UBYTE CART_GetByte(UWORD addr)
 {
 	if (rtime8_enabled && (addr == 0xd5b8 || addr == 0xd5b9))
 		return RTIME8_GetByte();
-	CART_Access(addr);
 	return 0xff;
 }
 
@@ -473,192 +286,68 @@ void CART_PutByte(UWORD addr, UBYTE byte)
 		RTIME8_PutByte(byte);
 		return;
 	}
-	switch (cart_type) {
-	case CART_XEGS_32:
-		set_bank_809F(byte & 0x03, 0x6000);
-		break;
-	case CART_XEGS_64:
-		set_bank_809F(byte & 0x07, 0xe000);
-		break;
-	case CART_XEGS_128:
-		set_bank_809F(byte & 0x0f, 0x1e000);
-		break;
-	case CART_XEGS_256:
-		set_bank_809F(byte & 0x1f, 0x3e000);
-		break;
-	case CART_XEGS_512:
-		set_bank_809F(byte & 0x3f, 0x7e000);
-		break;
-	case CART_XEGS_1024:
-		set_bank_809F(byte & 0x7f, 0xfe000);
-		break;
-	case CART_ATRAX_128:
-		if (byte & 0x80) {
-			if (bank >= 0) {
-				CartA0BF_Disable();
-				bank = -1;
-			}
-		}
-		else {
-			int b = byte & 0xf;
-			if (b != bank) {
-				CartA0BF_Enable();
-				CopyROM(0xa000, 0xbfff, cart_image + b * 0x2000);
-				bank = b;
-			}
-		}
-		break;
-	case CART_MEGA_16:
-		set_bank_80BF(byte & 0x80);
-		break;
-	case CART_MEGA_32:
-		set_bank_80BF(byte & 0x81);
-		break;
-	case CART_MEGA_64:
-		set_bank_80BF(byte & 0x83);
-		break;
-	case CART_MEGA_128:
-		set_bank_80BF(byte & 0x87);
-		break;
-	case CART_MEGA_256:
-		set_bank_80BF(byte & 0x8f);
-		break;
-	case CART_MEGA_512:
-		set_bank_80BF(byte & 0x9f);
-		break;
-	case CART_MEGA_1024:
-		set_bank_80BF(byte & 0xbf);
-		break;
-	case CART_SWXEGS_32:
-		set_bank_809F(byte & 0x83, 0x6000);
-		break;
-	case CART_SWXEGS_64:
-		set_bank_809F(byte & 0x87, 0xe000);
-		break;
-	case CART_SWXEGS_128:
-		set_bank_809F(byte & 0x8f, 0x1e000);
-		break;
-	case CART_SWXEGS_256:
-		set_bank_809F(byte & 0x9f, 0x3e000);
-		break;
-	case CART_SWXEGS_512:
-		set_bank_809F(byte & 0xbf, 0x7e000);
-		break;
-	case CART_SWXEGS_1024:
-		set_bank_809F(byte, 0xfe000);
-		break;
-	default:
-		CART_Access(addr);
-		break;
-	}
 }
 
 /* special support of Bounty Bob on Atari5200 */
 void CART_BountyBob1(UWORD addr)
 {
-	if (machine_type == MACHINE_5200) {
-		if (addr >= 0x4ff6 && addr <= 0x4ff9) {
-			addr -= 0x4ff6;
-			CopyROM(0x4000, 0x4fff, cart_image + addr * 0x1000);
-		}
-	} else {
-		if (addr >= 0x8ff6 && addr <= 0x8ff9) {
-			addr -= 0x8ff6;
-			CopyROM(0x8000, 0x8fff, cart_image + addr * 0x1000);
-		}
+	if (addr >= 0x4ff6 && addr <= 0x4ff9) {
+		addr -= 0x4ff6;
+		CopyROM(0x4000, 0x4fff, cart_image + addr * 0x1000);
 	}
 }
 
 void CART_BountyBob2(UWORD addr)
 {
-	if (machine_type == MACHINE_5200) {
-		if (addr >= 0x5ff6 && addr <= 0x5ff9) {
-			addr -= 0x5ff6;
-			CopyROM(0x5000, 0x5fff, cart_image + 0x4000 + addr * 0x1000);
-		}
-	}
-	else {
-		if (addr >= 0x9ff6 && addr <= 0x9ff9) {
-			addr -= 0x9ff6;
-			CopyROM(0x9000, 0x9fff, cart_image + 0x4000 + addr * 0x1000);
-		}
+	if (addr >= 0x5ff6 && addr <= 0x5ff9) {
+		addr -= 0x5ff6;
+		CopyROM(0x5000, 0x5fff, cart_image + 0x4000 + addr * 0x1000);
 	}
 }
 
 #ifdef PAGED_ATTRIB
 UBYTE BountyBob1_GetByte(UWORD addr)
 {
-	if (machine_type == MACHINE_5200) {
-		if (addr >= 0x4ff6 && addr <= 0x4ff9) {
-			CART_BountyBob1(addr);
-			return 0;
-		}
-	} else {
-		if (addr >= 0x8ff6 && addr <= 0x8ff9) {
-			CART_BountyBob1(addr);
-			return 0;
-		}
+	if (addr >= 0x4ff6 && addr <= 0x4ff9) {
+		CART_BountyBob1(addr);
+		return 0;
 	}
+
 	return dGetByte(addr);
 }
 
 UBYTE BountyBob2_GetByte(UWORD addr)
 {
-	if (machine_type == MACHINE_5200) {
-		if (addr >= 0x5ff6 && addr <= 0x5ff9) {
-			CART_BountyBob2(addr);
-			return 0;
-		}
-	} else {
-		if (addr >= 0x9ff6 && addr <= 0x9ff9) {
-			CART_BountyBob2(addr);
-			return 0;
-		}
+	if (addr >= 0x5ff6 && addr <= 0x5ff9) {
+		CART_BountyBob2(addr);
+		return 0;
 	}
+
 	return dGetByte(addr);
 }
 
 void BountyBob1_PutByte(UWORD addr, UBYTE value)
 {
-	if (machine_type == MACHINE_5200) {
-		if (addr >= 0x4ff6 && addr <= 0x4ff9) {
-			CART_BountyBob1(addr);
-		}
-	} else {
-		if (addr >= 0x8ff6 && addr <= 0x8ff9) {
-			CART_BountyBob1(addr);
-		}
+	if (addr >= 0x4ff6 && addr <= 0x4ff9) {
+		CART_BountyBob1(addr);
 	}
 }
 
 void BountyBob2_PutByte(UWORD addr, UBYTE value)
 {
-	if (machine_type == MACHINE_5200) {
-		if (addr >= 0x5ff6 && addr <= 0x5ff9) {
-			CART_BountyBob2(addr);
-		}
-	} else {
-		if (addr >= 0x9ff6 && addr <= 0x9ff9) {
-			CART_BountyBob2(addr);
-		}
+	if (addr >= 0x5ff6 && addr <= 0x5ff9) {
+		CART_BountyBob2(addr);
 	}
 }
 #endif
 
-int CART_Checksum(const UBYTE *image, int nbytes)
-{
-	int checksum = 0;
-	while (nbytes > 0) {
-		checksum += *image++;
-		nbytes--;
-	}
-	return checksum;
-}
-
 int CART_Insert(const uint8_t *data, size_t size)
 {
-	int type;
-	UBYTE header[16];
+	const struct cart_info_t *cart_info_entry = NULL;
+	unsigned char md5_digest[16] = {0};
+	char md5_hash[33] = {0};
+	MD5_CTX md5_ctx;
+	size_t size_kb;
 
 	/* remove currently inserted cart */
 	CART_Remove();
@@ -666,324 +355,104 @@ int CART_Insert(const uint8_t *data, size_t size)
 	if (data == NULL || size < 16)
 		return CART_CANT_OPEN;
 
-	/* if full kilobytes, assume it is raw image */
-	if ((size & 0x3ff) == 0) {
-#ifdef NOCASH
-		nocashMessage("raw image detected\n");
-#endif  
-		/* Assign pointers */
-		platform_cart_image = data;
-		platform_cart_size  = size;
-		cart_image          = (UBYTE *)data;
-		/* find cart type */
-		uint32_t crccomputed = encoding_crc32(0, cart_image, size);
-		cart_type = CART_NONE;
-		size >>= 10;	/* number of kilobytes */
-		for (type = 1; type <= CART_LAST_SUPPORTED; type++)
-			if (cart_kb[type] == size) {
-				if (cart_type == CART_NONE) {
-					cart_type = type;
-				}
-				else {
-#ifdef NOCASH      
-					nocashMessage("multiple cart type");
-#endif      
-					cart_type = cart_wait_on_type(crccomputed);
-					cart_type = (cart_type == 1 ? CART_5200_EE_16 : CART_5200_NS_16);
-					break;
-				}
-			}
-		if (cart_type != CART_NONE) {
-			CART_Start();
-#ifdef NOCASH      
-			nocashMessage("found cart type");
-#endif      
-			return 0;	
+	/* Assign pointer */
+	cart_image = (UBYTE *)data;
+
+	/* find cart type */
+	memcpy(&cart_info, &cart_info_none, sizeof(cart_info));
+
+	size_kb = size >> 10; /* number of kilobytes */
+
+	if      (size_kb == 4)  cart_info.type = CART_5200_4;
+	else if (size_kb == 8)  cart_info.type = CART_5200_8;
+	else if (size_kb == 16) cart_info.type = CART_5200_NS_16;
+	else if (size_kb == 32) cart_info.type = CART_5200_32;
+	else if (size_kb == 40) cart_info.type = CART_5200_40;
+
+	/* Get md5sum of cart data and check if it matches
+	 * an entry in the master list */
+	MD5_Init(&md5_ctx);
+	MD5_Update(&md5_ctx, data, size);
+	MD5_Final(md5_digest, &md5_ctx);
+
+	snprintf(md5_hash, sizeof(md5_hash),
+			"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+			md5_digest[0],  md5_digest[1],  md5_digest[2],  md5_digest[3],
+			md5_digest[4],  md5_digest[5],  md5_digest[6],  md5_digest[7],
+			md5_digest[8],  md5_digest[9],  md5_digest[10], md5_digest[11],
+			md5_digest[12], md5_digest[13], md5_digest[14], md5_digest[15]);
+
+	for (cart_info_entry = cart_info_table;
+		  cart_info_entry->type != CART_NONE;
+		  cart_info_entry++)
+		if (string_is_equal(md5_hash, cart_info_entry->md5))
+		{
+			memcpy(&cart_info, cart_info_entry, sizeof(cart_info));
+			a5200_log(RETRO_LOG_INFO, "Detected cart: %s\n", cart_info.name);
+			break;
 		}
-		cart_image = NULL;
-		return CART_BAD_FORMAT;
+
+	/* If valid cart is detected, start it */
+	if (cart_info.type != CART_NONE)
+	{
+		CART_Start();
+		return 0;
 	}
-	/* if not full kilobytes, assume it is CART file */
-	memcpy(header, data, 16);
-	if ((header[0] == 'C') &&
-		 (header[1] == 'A') &&
-		 (header[2] == 'R') &&
-		 (header[3] == 'T')) {
-		type = (header[4] << 24) |
-				 (header[5] << 16) |
-				 (header[6] << 8) |
-				  header[7];
-		if (CART_IsFor5200(type)) { return CART_BAD_FORMAT; }
-		if (type >= 1 && type <= CART_LAST_SUPPORTED) {
-			int checksum;
-			int size_corrected = cart_kb[type] << 10;
-			size_corrected = (size_corrected > size - 16) ? size - 16 : size_corrected;
-			/* Assign pointers */
-			platform_cart_image = data;
-			platform_cart_size  = size;
-			cart_image          = (UBYTE *)(data + 16);
-			checksum = (header[8] << 24) |
-						  (header[9] << 16) |
-						  (header[10] << 8) |
-							header[11];
-			cart_type = type;
-			CART_Start();
-			{
-				int checksum2 = CART_Checksum(cart_image, size_corrected);
-				int error = (checksum == checksum2) ? 0 : CART_BAD_CHECKSUM;
-				return error;
-			}
-		}
-	}
+
+	cart_image = NULL;
 	return CART_BAD_FORMAT;
 }
 
 void CART_Remove(void) {
-#ifdef NOCASH
-	char sz[64];sprintf(sz,"CART_Remove %08x\n",cart_image);nocashMessage(sz);
-#endif
-	cart_type = CART_NONE;
+	memcpy(&cart_info, &cart_info_none, sizeof(cart_info));
 	cart_image = NULL;
 	CART_Start();
 }
 
 void CART_Start(void) {
-#ifdef NOCASH
-  char sz[64];sprintf(sz,"CART_Start M%d %d\n",machine_type,cart_type);nocashMessage(sz);
-#endif
-	if (machine_type == MACHINE_5200) {
-		SetROM(0x4ff6, 0x4ff9);		/* disable Bounty Bob bank switching */
-		SetROM(0x5ff6, 0x5ff9);
-		switch (cart_type) {
-		case CART_5200_32:
-#ifdef NOCASH
-      nocashMessage("patch CART_5200_32");
-#endif      
-			CopyROM(0x4000, 0xbfff, cart_image);
-			break;
-		case CART_5200_EE_16:
-#ifdef NOCASH
-      nocashMessage("patch CART_5200_EE_16");
-#endif      
-			CopyROM(0x4000, 0x5fff, cart_image);
-			CopyROM(0x6000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x2000);
-			break;
-		case CART_5200_40:
-#ifdef NOCASH
-      nocashMessage("patch CART_5200_40");
-#endif      
-			CopyROM(0x4000, 0x4fff, cart_image);
-			CopyROM(0x5000, 0x5fff, cart_image + 0x4000);
-			CopyROM(0x8000, 0x9fff, cart_image + 0x8000);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x8000);
+	SetROM(0x4ff6, 0x4ff9);		/* disable Bounty Bob bank switching */
+	SetROM(0x5ff6, 0x5ff9);
+	switch (cart_info.type) {
+	case CART_5200_32:
+		CopyROM(0x4000, 0xbfff, cart_image);
+		break;
+	case CART_5200_EE_16:
+		CopyROM(0x4000, 0x5fff, cart_image);
+		CopyROM(0x6000, 0x9fff, cart_image);
+		CopyROM(0xa000, 0xbfff, cart_image + 0x2000);
+		break;
+	case CART_5200_40:
+		CopyROM(0x4000, 0x4fff, cart_image);
+		CopyROM(0x5000, 0x5fff, cart_image + 0x4000);
+		CopyROM(0x8000, 0x9fff, cart_image + 0x8000);
+		CopyROM(0xa000, 0xbfff, cart_image + 0x8000);
 #ifndef PAGED_ATTRIB
-			SetHARDWARE(0x4ff6, 0x4ff9);
-			SetHARDWARE(0x5ff6, 0x5ff9);
+		SetHARDWARE(0x4ff6, 0x4ff9);
+		SetHARDWARE(0x5ff6, 0x5ff9);
 #else
-			readmap[0x4f] = BountyBob1_GetByte;
-			readmap[0x5f] = BountyBob2_GetByte;
-			writemap[0x4f] = BountyBob1_PutByte;
-			writemap[0x5f] = BountyBob2_PutByte;
+		readmap[0x4f] = BountyBob1_GetByte;
+		readmap[0x5f] = BountyBob2_GetByte;
+		writemap[0x4f] = BountyBob1_PutByte;
+		writemap[0x5f] = BountyBob2_PutByte;
 #endif
-			break;
-		case CART_5200_NS_16:
-#ifdef NOCASH
-      nocashMessage("patch CART_5200_NS_16");
-#endif      
-			CopyROM(0x8000, 0xbfff, cart_image);
-			break;
-		case CART_5200_8:
-#ifdef NOCASH
-      nocashMessage("patch CART_5200_8");
-#endif      
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image);
-			break;
-		case CART_5200_4:
-#ifdef NOCASH
-      nocashMessage("patch CART_5200_4");
-#endif      
-			CopyROM(0x8000, 0x8fff, cart_image);
-			CopyROM(0x9000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xafff, cart_image);
-			CopyROM(0xb000, 0xbfff, cart_image);
-			break;
-		default:
-#ifdef NOCASH
-      nocashMessage("patch default");
-#endif      
-			/* clear cartridge area so the 5200 will crash */
-			dFillMem(0x4000, 0, 0x8000);
-			break;
-		}
-	}
-	else {
-		switch (cart_type) {
-		case CART_STD_8:
-		case CART_PHOENIX_8:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image);
-			break;
-		case CART_STD_16:
-		case CART_BLIZZARD_16:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0xbfff, cart_image);
-			break;
-		case CART_OSS_16:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xafff, cart_image);
-			CopyROM(0xb000, 0xbfff, cart_image + 0x3000);
-			bank = 0;
-			break;
-		case CART_DB_32:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x6000);
-			bank = 0;
-			break;
-		case CART_WILL_64:
-		case CART_WILL_32:
-		case CART_EXP_64:
-		case CART_DIAMOND_64:
-		case CART_SDX_64:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image);
-			bank = 0;
-			break;
-		case CART_XEGS_32:
-		case CART_SWXEGS_32:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x6000);
-			bank = 0;
-			break;
-		case CART_XEGS_64:
-		case CART_SWXEGS_64:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0xe000);
-			bank = 0;
-			break;
-		case CART_XEGS_128:
-		case CART_SWXEGS_128:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x1e000);
-			bank = 0;
-			break;
-		case CART_XEGS_256:
-		case CART_SWXEGS_256:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x3e000);
-			bank = 0;
-			break;
-		case CART_XEGS_512:
-		case CART_SWXEGS_512:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x7e000);
-			bank = 0;
-			break;
-		case CART_XEGS_1024:
-		case CART_SWXEGS_1024:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x9fff, cart_image);
-			CopyROM(0xa000, 0xbfff, cart_image + 0xfe000);
-			bank = 0;
-			break;
-		case CART_OSS2_16:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xafff, cart_image + 0x1000);
-			CopyROM(0xb000, 0xbfff, cart_image);
-			bank = 0;
-			break;
-		case CART_ATRAX_128:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image);
-			bank = 0;
-			break;
-		case CART_BBSB_40:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0x8fff, cart_image);
-			CopyROM(0x9000, 0x9fff, cart_image + 0x4000);
-			CopyROM(0xa000, 0xbfff, cart_image + 0x8000);
-#ifndef PAGED_ATTRIB
-			SetHARDWARE(0x8ff6, 0x8ff9);
-			SetHARDWARE(0x9ff6, 0x9ff9);
-#else
-			readmap[0x8f] = BountyBob1_GetByte;
-			readmap[0x9f] = BountyBob2_GetByte;
-			writemap[0x8f] = BountyBob1_PutByte;
-			writemap[0x9f] = BountyBob2_PutByte;
-#endif
-			break;
-		case CART_RIGHT_8:
-			if (machine_type == MACHINE_OSA || machine_type == MACHINE_OSB) {
-				Cart809F_Enable();
-				CopyROM(0x8000, 0x9fff, cart_image);
-				if ((!disable_basic || loading_basic) && have_basic) {
-					CartA0BF_Enable();
-					CopyROM(0xa000, 0xbfff, atari_basic);
-					break;
-				}
-				CartA0BF_Disable();
-				break;
-			}
-			/* there's no right slot in XL/XE */
-			Cart809F_Disable();
-			CartA0BF_Disable();
-			break;
-		case CART_MEGA_16:
-		case CART_MEGA_32:
-		case CART_MEGA_64:
-		case CART_MEGA_128:
-		case CART_MEGA_256:
-		case CART_MEGA_512:
-		case CART_MEGA_1024:
-			Cart809F_Enable();
-			CartA0BF_Enable();
-			CopyROM(0x8000, 0xbfff, cart_image);
-			bank = 0;
-			break;
-		case CART_ATMAX_128:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image);
-			bank = 0;
-			break;
-		case CART_ATMAX_1024:
-			Cart809F_Disable();
-			CartA0BF_Enable();
-			CopyROM(0xa000, 0xbfff, cart_image + 0xfe000);
-			bank = 0x7f;
-			break;
-		default:
-			Cart809F_Disable();
-			if ((machine_type == MACHINE_OSA || machine_type == MACHINE_OSB)
-			 && (!disable_basic || loading_basic) && have_basic) {
-				CartA0BF_Enable();
-				CopyROM(0xa000, 0xbfff, atari_basic);
-				break;
-			}
-			CartA0BF_Disable();
-			break;
-		}
+		break;
+	case CART_5200_NS_16:
+		CopyROM(0x8000, 0xbfff, cart_image);
+		break;
+	case CART_5200_8:
+		CopyROM(0x8000, 0x9fff, cart_image);
+		CopyROM(0xa000, 0xbfff, cart_image);
+		break;
+	case CART_5200_4:
+		CopyROM(0x8000, 0x8fff, cart_image);
+		CopyROM(0x9000, 0x9fff, cart_image);
+		CopyROM(0xa000, 0xafff, cart_image);
+		CopyROM(0xb000, 0xbfff, cart_image);
+		break;
+	default:
+		/* clear cartridge area so the 5200 will crash */
+		dFillMem(0x4000, 0, 0x8000);
+		break;
 	}
 }
 
@@ -991,25 +460,17 @@ void CART_Start(void) {
 
 void CARTStateRead(void)
 {
+	/* Unused, but load the cart type for backwards
+	 * compatibility with old state files */
 	int savedCartType = CART_NONE;
-
-	/* Read the cart type from the file.  If there is no cart type, becaused we have
-	   reached the end of the file, this will just default to CART_NONE */
 	ReadINT(&savedCartType, 1);
-	if (savedCartType != CART_NONE) {
-		/* Insert the cartridge... */
-		if (CART_Insert(platform_cart_image, platform_cart_size) >= 0) {
-			/* And set the type to the saved type, in case it was a raw cartridge image */
-			cart_type = savedCartType;
-			CART_Start();
-		}
-	}
 }
 
 void CARTStateSave(void)
 {
-	/* Save the cartridge type, or CART_NONE if there isn't one...*/
-	SaveINT(&cart_type, 1);
+	/* Unused, but save the cart type for backwards
+	 * compatibility with old state files */
+	SaveINT(&cart_info.type, 1);
 }
 
 #endif
