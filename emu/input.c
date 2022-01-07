@@ -27,6 +27,7 @@
 #include "antic.h"
 #include "atari.h"
 #include "cassette.h"
+#include "cartridge.h"
 #include "cpu.h"
 #include "gtia.h"
 #include "input.h"
@@ -135,10 +136,37 @@ void INPUT_Frame(void) {
 			press_space = 0;
 		}
 		else 
-    {
+		{
 			last_key_code = AKEY_NONE;
 		}
 	}
+
+	/* The 5200 has only 4 of the 6 keyboard scan lines connected.
+	 * Pressing one 5200 key is like pressing 4 Atari 800 keys.
+	 * The LSB (bit 0) and bit 5 are the two missing lines.
+	 * When debounce is enabled, multiple keys pressed generate
+	 * no results.
+	 * When debounce is disabled, multiple keys pressed generate
+	 * results only when in numerical sequence.
+	 * Thus the LSB being one of the missing lines is important
+	 * because that causes events to be generated.
+	 * Two events are generated every 64 scan lines
+	 * but this code only does one every frame.
+	 * Bit 5 is different for each keypress because it is one
+	 * of the missing lines. */
+	static int bit5_5200 = 0;
+	if (bit5_5200)
+		key_code &= ~0x20;
+
+	if (cart_info.keys_debounced)
+		bit5_5200 = !bit5_5200;
+	else
+		bit5_5200 = 0;
+
+	/* 5200 2nd fire button generates CTRL as well */
+	if (key_shift)
+		key_code |= AKEY_SHFTCTRL;
+
 	if (key_code >= 0) {
 	  SKSTAT &= ~4;
 		if ((key_code ^ last_key_code) & ~AKEY_SHFTCTRL) {

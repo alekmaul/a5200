@@ -215,7 +215,7 @@ static const struct cart_info_t cart_info_table[] = {
 	{ "0dc44c5bf0829649b7fec37cb0a8186b", CART_5200_32,    1, "Rescue on Fractalus! (USA).a52" },
 	{ "ddf7834a420f1eaae20a7a6255f80a99", CART_5200_EE_16, 1, "Road Runner (USA) (Proto).a52" },
 	{ "86b358c9bca97c2089b929e3b2751908", CART_5200_32,    1, "Rockball 5200.a52" },
-	{ "5dba5b478b7da9fd2c617e41fb5ccd31", CART_5200_NS_16, 1, "Robotron 2084 (USA).a52" },
+	{ "5dba5b478b7da9fd2c617e41fb5ccd31", CART_5200_NS_16, 0, "Robotron 2084 (USA).a52" },
 	{ "b8cbc918cf2bc81f941719b874f13fcb", CART_5200_32,    1, "Runner5200.a52" },
 	{ "950aa1075eaf4ee2b2c2cfcf8f6c25b4", CART_5200_32,    1, "Satans Hollow (Conv).a52" },
 	{ "b610a576cbf26a259da4ec5e38c33f09", CART_5200_NS_16, 1, "Savage Pond (XL Conversion).a52" },
