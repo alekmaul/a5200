@@ -55,6 +55,24 @@ struct retro_core_option_v2_category option_cats_us[] = {
 
 struct retro_core_option_v2_definition option_defs_us[] = {
    {
+      "a5200_mix_frames",
+      "Interframe Blending",
+      NULL,
+      "Simulate CRT phosphor ghosting effects. 'Simple' performs a 50:50 mix of the current and previous frames. 'Ghosting' accumulates pixels from multiple successive frames. May be used to alleviate screen flicker.",
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "mix",      "Simple" },
+         { "ghost_65", "Ghosting (65%)" },
+         { "ghost_75", "Ghosting (75%)" },
+         { "ghost_85", "Ghosting (85%)" },
+         { "ghost_95", "Ghosting (95%)" },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       "a5200_low_pass_filter",
       "Audio Filter",
       NULL,
