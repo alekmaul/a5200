@@ -52,8 +52,6 @@ extern int DELAYED_XMTDONE_IRQ;
 
 extern UBYTE POT_input[8];
 
-ULONG POKEY_GetRandomCounter(void);
-void POKEY_SetRandomCounter(ULONG value);
 UBYTE POKEY_GetByte(UWORD addr);
 void POKEY_PutByte(UWORD addr, UBYTE byte);
 void POKEY_Initialise(void);
