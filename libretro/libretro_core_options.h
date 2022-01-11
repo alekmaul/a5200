@@ -55,6 +55,20 @@ struct retro_core_option_v2_category option_cats_us[] = {
 
 struct retro_core_option_v2_definition option_defs_us[] = {
    {
+      "a5200_bios",
+      "BIOS (Restart)",
+      NULL,
+      "Set BIOS image. 'Official' loads an original console dump provided by the user, named '5200.rom' and placed in the frontend 'System' directory. 'Internal (Altirra OS)' uses an inbuilt open-source alternative with reduced compatibility. The 'Official' BIOS is recommended for correct operation.",
+      NULL,
+      NULL,
+      {
+         { "official", "Official" },
+         { "internal", "Internal (Altirra OS)" },
+         { NULL, NULL },
+      },
+      "official"
+   },
+   {
       "a5200_mix_frames",
       "Interframe Blending",
       NULL,
