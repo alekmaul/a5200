@@ -79,6 +79,7 @@ static retro_audio_sample_batch_t audio_batch_cb;
 #define A5200_JOY_MAX 220
 #define A5200_JOY_CENTER 114
 #define A5200_VIRTUAL_NUMPAD_THRESHOLD 0.7
+#define A5200_NUM_PADS 2
 
 static const uint32_t a5200_palette_ntsc[A5200_PALETTE_SIZE] = {
    0x000000, 0x252525, 0x343434, 0x4F4F4F,
@@ -198,10 +199,18 @@ static bool audio_low_pass_enabled  = false;
 static int32_t audio_low_pass_range = (60 * 0x10000) / 100;
 static int32_t audio_low_pass_prev  = 0;
 
-static unsigned input_shift_ctrl      = 0;
-static int input_analog_deadzone      = (int)(0.15f * (float)LIBRETRO_ANALOG_RANGE);
-static bool input_dual_stick_enabled  = false;
-static float input_analog_sensitivity = 1.0f;
+enum input_hack_type
+{
+   INPUT_HACK_NONE = 0,
+   INPUT_HACK_DUAL_STICK,
+   INPUT_HACK_SWAP_PORTS
+};
+
+static unsigned input_shift_ctrl       = 0;
+static enum input_hack_type input_hack = INPUT_HACK_NONE;
+static int input_analog_deadzone       = (int)(0.15f * (float)LIBRETRO_ANALOG_RANGE);
+static float input_analog_sensitivity  = 1.0f;
+static bool input_analog_quadratic     = false;
 
 static uint8_t *rom_buf        = NULL;
 static const uint8_t *rom_data = NULL;
@@ -485,7 +494,7 @@ static void check_variables(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
        !string_is_empty(var.value) &&
        string_is_equal(var.value, "enabled"))
-         audio_low_pass_enabled = true;
+      audio_low_pass_enabled = true;
 
    /* Audio Filter Level */
    var.key              = "a5200_low_pass_range";
@@ -499,15 +508,19 @@ static void check_variables(void)
       audio_low_pass_range  = (filter_level * 0x10000) / 100;
    }
 
-   /* Dual Stick Controller */
-   var.key                  = "a5200_gamepad_dual_stick_hack";
-   var.value                = NULL;
-   input_dual_stick_enabled = false;
+   /* Controller Hacks */
+   var.key    = "a5200_input_hack";
+   var.value  = NULL;
+   input_hack = INPUT_HACK_NONE;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
-       !string_is_empty(var.value) &&
-       string_is_equal(var.value, "enabled"))
-         input_dual_stick_enabled = true;
+       !string_is_empty(var.value))
+   {
+      if (string_is_equal(var.value, "dual_stick"))
+         input_hack = INPUT_HACK_DUAL_STICK;
+      else if (string_is_equal(var.value, "swap_ports"))
+         input_hack = INPUT_HACK_SWAP_PORTS;
+   }
 
    /* Analog Sensitivity */
    var.key                  = "a5200_analog_sensitivity";
@@ -520,6 +533,16 @@ static void check_variables(void)
       unsigned sensitivity     = string_to_unsigned(var.value);
       input_analog_sensitivity = (float)sensitivity / 100.0f;
    }
+
+   /* Analog Response */
+   var.key                = "a5200_analog_response";
+   var.value              = NULL;
+   input_analog_quadratic = false;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
+       !string_is_empty(var.value) &&
+       string_is_equal(var.value, "enabled"))
+      input_analog_quadratic = true;
 
    /* Analog Deadzone */
    var.key               = "a5200_analog_deadzone";
@@ -545,6 +568,15 @@ static INLINE unsigned int a5200_get_analog_pot(int input)
 
    /* Apply sensitivity correction */
    amplitude *= input_analog_sensitivity;
+
+   /* Check whether analog response is quadratic */
+   if (input_analog_quadratic)
+   {
+      if (amplitude < 0.0)
+         amplitude = -(amplitude * amplitude);
+      else
+         amplitude = amplitude * amplitude;
+   }
 
    /* Map to Atari 5200 values */
    if (amplitude >= 0.0f)
@@ -605,7 +637,7 @@ static unsigned a5200_get_analog_numpad_key(int input_x, int input_y)
 
 static void update_input(void)
 {
-   size_t pad;
+   size_t pad_idx;
 
    input_poll_cb();
 
@@ -613,9 +645,13 @@ static void update_input(void)
    key_shift  = 0;
    key_consol = CONSOL_NONE;
 
-   for (pad = 0; pad < 2; pad++)
+   /* pad_idx: Physical RetroPad
+    * pad:     Emulated controller */
+   for (pad_idx = 0; pad_idx < A5200_NUM_PADS; pad_idx++)
    {
       unsigned joypad_bits = 0;
+      size_t pad           = (input_hack == INPUT_HACK_SWAP_PORTS) ?
+            ((A5200_NUM_PADS - 1) - pad_idx) : pad_idx;
       int left_analog_x;
       int left_analog_y;
       int right_analog_x;
@@ -631,10 +667,12 @@ static void update_input(void)
 
       /* Read input */
       if (libretro_supports_bitmasks)
-         joypad_bits = input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+         joypad_bits = input_state_cb(pad_idx,
+               RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
       else
          for (i = 0; i < (RETRO_DEVICE_ID_JOYPAD_R3+1); i++)
-            joypad_bits |= input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, i) ? (1 << i) : 0;
+            joypad_bits |= input_state_cb(pad_idx,
+                  RETRO_DEVICE_JOYPAD, 0, i) ? (1 << i) : 0;
 
       /* D-Pad */
       if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_UP))
@@ -661,9 +699,9 @@ static void update_input(void)
          joy_5200_stick[pad] = STICK_RIGHT;
 
       /* Analog joystick */
-      left_analog_x = input_state_cb(pad, RETRO_DEVICE_ANALOG,
+      left_analog_x = input_state_cb(pad_idx, RETRO_DEVICE_ANALOG,
             RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
-      left_analog_y = input_state_cb(pad, RETRO_DEVICE_ANALOG,
+      left_analog_y = input_state_cb(pad_idx, RETRO_DEVICE_ANALOG,
             RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
 
       if ((left_analog_x < -input_analog_deadzone) ||
@@ -685,11 +723,13 @@ static void update_input(void)
 
       /* Internal emulation code only supports
        * 2nd trigger/start/pause/number pad input
-       * from player 1 */
-      if (pad > 0)
+       * from player 1 (i.e. activating these
+       * inputs generates an identical signal
+       * from *all* connected controllers) */
+      if (pad_idx > 0)
          break;
 
-      /* 2st trigger button */
+      /* 2nd trigger button */
       if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_B))
       {
          input_shift_ctrl ^= AKEY_SHFT;
@@ -711,15 +751,14 @@ static void update_input(void)
          key_code += AKEY_5200_0;
       else if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_R3))
          key_code += AKEY_5200_5;
-      else if (!input_dual_stick_enabled)
+      else if (input_hack != INPUT_HACK_DUAL_STICK)
       {
-         /* If the dual stick hack is disabled,
-          * right analog stick is used as a virtual
-          * number pad, with directions mapping to
-          * the physical key layout */
-         right_analog_x = input_state_cb(pad, RETRO_DEVICE_ANALOG,
+         /* If dual stick hack is disabled, right analog
+          * stick is used as a virtual number pad, with
+          * directions mapping to the physical key layout */
+         right_analog_x = input_state_cb(pad_idx, RETRO_DEVICE_ANALOG,
                RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
-         right_analog_y = input_state_cb(pad, RETRO_DEVICE_ANALOG,
+         right_analog_y = input_state_cb(pad_idx, RETRO_DEVICE_ANALOG,
                RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
 
          if ((right_analog_x < -input_analog_deadzone) ||
@@ -731,32 +770,36 @@ static void update_input(void)
 
       /* Dual stick hack
        * > Maps player 2's joystick to the right
-       *   analog stick of player 1's RetroPad */
-      if (input_dual_stick_enabled)
+       *   analog stick of player 1's RetroPad
+       * > Note that we can safely use pad_idx
+       *   when indexing arrays here, since
+       *   port swapping cannot be enabled when
+       *   dual stick hack is active */
+      if (input_hack == INPUT_HACK_DUAL_STICK)
       {
-         right_analog_x = input_state_cb(pad, RETRO_DEVICE_ANALOG,
+         right_analog_x = input_state_cb(pad_idx, RETRO_DEVICE_ANALOG,
                RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
-         right_analog_y = input_state_cb(pad, RETRO_DEVICE_ANALOG,
+         right_analog_y = input_state_cb(pad_idx, RETRO_DEVICE_ANALOG,
                RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
 
          if ((right_analog_x < -input_analog_deadzone) ||
              (right_analog_x > input_analog_deadzone))
          {
-            joy_5200_pot[((pad + 1) << 1) + 0] = a5200_get_analog_pot(right_analog_x);
-            atari_analog[pad + 1]              = 1;
+            joy_5200_pot[((pad_idx + 1) << 1) + 0] = a5200_get_analog_pot(right_analog_x);
+            atari_analog[pad_idx + 1]              = 1;
          }
 
          if ((right_analog_y < -input_analog_deadzone) ||
              (right_analog_y > input_analog_deadzone))
          {
-            joy_5200_pot[((pad + 1) << 1) + 1] = a5200_get_analog_pot(right_analog_y);
-            atari_analog[pad + 1]              = 1;
+            joy_5200_pot[((pad_idx + 1) << 1) + 1] = a5200_get_analog_pot(right_analog_y);
+            atari_analog[pad_idx + 1]              = 1;
          }
 
-         /* When dual stick hack is enabled,
-          * player 2 input is disabled */
-         joy_5200_stick[pad + 1] = STICK_CENTRE;
-         joy_5200_trig[pad + 1]  = 1;
+         /* When dual stick hack is enabled, all
+          * other player 2 input is disabled */
+         joy_5200_stick[pad_idx + 1] = STICK_CENTRE;
+         joy_5200_trig[pad_idx + 1]  = 1;
          break;
       }
    }
@@ -1084,8 +1127,9 @@ void retro_init(void)
          sizeof(int16_t));
 
    input_shift_ctrl         = 0;
-   input_dual_stick_enabled = false;
+   input_hack               = INPUT_HACK_NONE;
    input_analog_sensitivity = 1.0f;
+   input_analog_quadratic   = false;
    audio_low_pass_prev      = 0;
 
    initialise_palette();
@@ -1096,8 +1140,9 @@ void retro_deinit(void)
 {
    libretro_supports_bitmasks = false;
    input_shift_ctrl           = 0;
-   input_dual_stick_enabled   = false;
+   input_hack                 = INPUT_HACK_NONE;
    input_analog_sensitivity   = 1.0f;
+   input_analog_quadratic     = false;
    audio_low_pass_prev        = 0;
 
    if (a5200_screen_buffer)

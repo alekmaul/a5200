@@ -118,15 +118,16 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "60"
    },
    {
-      "a5200_gamepad_dual_stick_hack",
-      "Dual Stick Controller",
+      "a5200_input_hack",
+      "Controller Hacks",
       NULL,
-      "Map Player 2's joystick to the right analog stick of Player 1's RetroPad. Enables dual stick control in supported games (e.g. required for Robotron 2084, Space Dungeon). Disables input for Player 2.",
+      "Apply gamepad input hacks required for specific games. 'Dual Stick' maps Player 2's joystick to the right analog stick of Player 1's RetroPad, enabling dual stick control in 'Robotron 2084' and 'Space Dungeon'. 'Swap Ports' maps Player 1 to port 2 and Player 2 to port 1 of the emulated console, correcting the swapped inputs of 'Wizard of Wor'.",
       NULL,
       NULL,
       {
-         { "disabled", NULL},
-         { "enabled",  NULL},
+         { "disabled", NULL },
+         { "dual_stick",  "Dual Stick" },
+         { "swap_ports",  "Swap Ports" },
          { NULL, NULL },
       },
       "disabled"
@@ -139,6 +140,8 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       NULL,
       {
+         { "5",   "5%" },
+         { "7",   "7%" },
          { "10",  "10%" },
          { "12",  "12%" },
          { "15",  "15%" },
@@ -179,6 +182,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "100"
+   },
+   {
+      "a5200_analog_response",
+      "Analog Response",
+      NULL,
+      "Configure movement speed response when tilting the gamepad's analog stick. 'Linear': Speed is directly proportional to stick displacement. 'Quadratic': Speed increases quadratically with stick displacement, enabling greater precision when making small movements without sacrificing maximum speed at full range.",
+      NULL,
+      NULL,
+      {
+         { "linear",    "Linear" },
+         { "quadratic", "Quadratic" },
+         { NULL, NULL },
+      },
+      "linear"
    },
    {
       "a5200_analog_deadzone",
