@@ -20,6 +20,7 @@
 #include <libretro.h>
 #include "libretro_core_options.h"
 
+#include "altirra_5200_os.h"
 #include "atari.h"
 #include "global.h"
 #include "cartridge.h"
@@ -55,6 +56,7 @@ static retro_audio_sample_batch_t audio_batch_cb;
 #define PI 3.141592653589793238
 #endif
 
+#define A5200_BIOS_FILE_NAME "5200.rom"
 #define A5200_BIOS_SIZE 0x800
 #define A5200_SAVE_STATE_SIZE 131357
 
@@ -215,6 +217,8 @@ static bool input_analog_quadratic     = false;
 static uint8_t *rom_buf        = NULL;
 static const uint8_t *rom_data = NULL;
 static size_t rom_size         = 0;
+
+static bool a5200_use_official_bios = true;
 
 static bool libretro_supports_bitmasks = false;
 
@@ -395,7 +399,7 @@ void a5200_log(enum retro_log_level level, const char *format, ...)
             "[a5200] %s", msg);
 }
 
-static bool load_bios(void)
+static void load_bios(void)
 {
    const char *system_dir = NULL;
    RFILE *bios_file       = NULL;
@@ -404,18 +408,23 @@ static bool load_bios(void)
 
    bios_path[0] = '\0';
 
+   /* If user has selected the internal bios,
+    * skip all file access */
+   if (!a5200_use_official_bios)
+      goto fallback;
+
    /* Get system directory */
    if (!environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) ||
        !system_dir)
    {
       a5200_log(RETRO_LOG_ERROR,
             "No system directory defined, unable to look for bios.\n");
-      return false;
+      goto fallback;
    }
 
    /* Get BIOS path */
    fill_pathname_join(bios_path, system_dir,
-         "5200.rom", sizeof(bios_path));
+         A5200_BIOS_FILE_NAME, sizeof(bios_path));
 
    /* Read BIOS file */
    bios_file = filestream_open(bios_path,
@@ -426,7 +435,7 @@ static bool load_bios(void)
    {
       a5200_log(RETRO_LOG_ERROR,
             "Failed to open bios file: %s\n", bios_path);
-      return false;
+      goto fallback;
    }
 
    bytes_read = filestream_read(bios_file,
@@ -437,11 +446,50 @@ static bool load_bios(void)
    {
       a5200_log(RETRO_LOG_ERROR,
             "Failed to read bios file: %s\n", bios_path);
-      return false;
+      goto fallback;
    }
 
    a5200_log(RETRO_LOG_INFO, "Read bios: %s\n", bios_path);
-   return true;
+   return;
+
+fallback:
+   /* Official bios missing or disabled - use
+    * internal open-source Altirra OS fallback
+    * (reduced compatibility) */
+   memcpy(atari_os, ROM_altirra_5200_os, A5200_BIOS_SIZE);
+
+   /* If official bios was selected, display
+    * a notification error message */
+   if (a5200_use_official_bios)
+   {
+      unsigned msg_interface_version = 0;
+      environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION,
+            &msg_interface_version);
+
+      if (msg_interface_version >= 1)
+      {
+         struct retro_message_ext msg = {
+            "Missing BIOS file (" A5200_BIOS_FILE_NAME
+                  ") - using internal",
+            2000,
+            3,
+            RETRO_LOG_ERROR,
+            RETRO_MESSAGE_TARGET_ALL,
+            RETRO_MESSAGE_TYPE_NOTIFICATION,
+            -1
+         };
+         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
+      }
+      else
+      {
+         struct retro_message msg = {
+            "Missing BIOS file (" A5200_BIOS_FILE_NAME
+                  ") - using internal",
+            120
+         };
+         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+      }
+   }
 }
 
 static void initialise_palette(void)
@@ -463,6 +511,16 @@ static void check_variables(void)
 {
    struct retro_variable var = {0};
    enum frame_blend_method blend_method;
+
+   /* BIOS */
+   var.key                 = "a5200_bios";
+   var.value               = NULL;
+   a5200_use_official_bios = true;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
+       !string_is_empty(var.value) &&
+       string_is_equal(var.value, "internal"))
+      a5200_use_official_bios = false;
 
    /* Interframe Blending */
    var.key      = "a5200_mix_frames";
@@ -1026,9 +1084,11 @@ bool retro_load_game(const struct retro_game_info *info)
    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
          input_descriptors);
 
+   /* Apply initial core options */
+   check_variables();
+
    /* Load bios */
-   if (!load_bios())
-      goto error;
+   load_bios();
 
    /* Load game */
    if (!Atari800_OpenFile(rom_data, rom_size, 1, 1, 1))
@@ -1038,9 +1098,6 @@ bool retro_load_game(const struct retro_game_info *info)
    }
 
    Atari800_Initialise();
-
-   /* Apply initial core options */
-   check_variables();
 
    return true;
 
@@ -1131,6 +1188,7 @@ void retro_init(void)
    input_analog_sensitivity = 1.0f;
    input_analog_quadratic   = false;
    audio_low_pass_prev      = 0;
+   a5200_use_official_bios  = true;
 
    initialise_palette();
    Screen_Initialise(a5200_screen_buffer);
@@ -1144,6 +1202,7 @@ void retro_deinit(void)
    input_analog_sensitivity   = 1.0f;
    input_analog_quadratic     = false;
    audio_low_pass_prev        = 0;
+   a5200_use_official_bios    = true;
 
    if (a5200_screen_buffer)
    {

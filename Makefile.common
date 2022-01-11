@@ -13,6 +13,7 @@ endif
 
 SOURCES_C := \
 	$(LIBRETRO_DIR)/libretro.c \
+	$(CORE_SRC_DIR)/altirra_5200_os.c \
 	$(CORE_SRC_DIR)/antic.c \
 	$(CORE_SRC_DIR)/atari.c \
 	$(CORE_SRC_DIR)/atari_nds.c \
