@@ -23,12 +23,7 @@
 */
 
 #include "config.h"
-#ifdef HAVE_TIME_H
 #include <time.h>
-#endif
-#ifdef WIN32
-#include <windows.h>
-#endif
 
 #include "atari.h"
 #include "cpu.h"
@@ -76,16 +71,6 @@ UBYTE pot_scanline;
 UBYTE poly9_lookup[511];
 UBYTE poly17_lookup[16385];
 static ULONG random_scanline_counter;
-
-ULONG POKEY_GetRandomCounter(void)
-{
-	return random_scanline_counter;
-}
-
-void POKEY_SetRandomCounter(ULONG value)
-{
-	random_scanline_counter = value;
-}
 
 UBYTE POKEY_GetByte(UWORD addr)
 {
@@ -374,14 +359,7 @@ void POKEY_Initialise(void)
 		poly17_lookup[i] = (UBYTE) (reg >> 1);
 	}
 
-	random_scanline_counter =
-#ifdef WIN32
-		GetTickCount() % POLY17_SIZE;
-#elif defined(HAVE_TIME)
-		time(NULL) % POLY17_SIZE;
-#else
-		0;
-#endif
+	random_scanline_counter = time(NULL) % POLY17_SIZE;
 }
 
 void POKEY_Frame(void) {
@@ -583,6 +561,8 @@ void POKEYStateSave(void)
 {
 	int SHIFT_KEY = 0;
 	int KEYPRESSED = 0;
+	UWORD random_scanline_counter_lo;
+	UWORD random_scanline_counter_hi;
 
 	SaveUBYTE(&KBCODE, 1);
 	SaveUBYTE(&IRQST, 1);
@@ -602,6 +582,16 @@ void POKEYStateSave(void)
 	SaveINT(&DivNIRQ[0], 4);
 	SaveINT(&DivNMax[0], 4);
 	SaveINT(&Base_mult[0], 1);
+
+	/* random_scanline_counter (current value of
+	 * the random number generator) must also be
+	 * saved/restored for consistent operation
+	 * (when using runahead, netplay. etc.) */
+	random_scanline_counter_lo = random_scanline_counter         & 0xFFFF;
+	random_scanline_counter_hi = (random_scanline_counter >> 16) & 0xFFFF;
+
+	SaveUWORD(&random_scanline_counter_lo, 1);
+	SaveUWORD(&random_scanline_counter_hi, 1);
 }
 
 void POKEYStateRead(void)
@@ -609,6 +599,8 @@ void POKEYStateRead(void)
 	int i;
 	int SHIFT_KEY;
 	int KEYPRESSED;
+	UWORD random_scanline_counter_lo = 0;
+	UWORD random_scanline_counter_hi = 0;
 
 	ReadUBYTE(&KBCODE, 1);
 	ReadUBYTE(&IRQST, 1);
@@ -633,6 +625,16 @@ void POKEYStateRead(void)
 	ReadINT(&DivNIRQ[0], 4);
 	ReadINT(&DivNMax[0], 4);
 	ReadINT(&Base_mult[0], 1);
+
+	/* random_scanline_counter (current value of
+	 * the random number generator) must also be
+	 * saved/restored for consistent operation
+	 * (when using runahead, netplay. etc.) */
+	ReadUWORD(&random_scanline_counter_lo, 1);
+	ReadUWORD(&random_scanline_counter_hi, 1);
+
+	random_scanline_counter = (random_scanline_counter_hi << 16) |
+			random_scanline_counter_lo;
 }
 
 #endif

@@ -58,7 +58,7 @@ static retro_audio_sample_batch_t audio_batch_cb;
 
 #define A5200_BIOS_FILE_NAME "5200.rom"
 #define A5200_BIOS_SIZE 0x800
-#define A5200_SAVE_STATE_SIZE 131357
+#define A5200_SAVE_STATE_SIZE 131361
 
 #define A5200_PALETTE_SIZE 256
 #define A5200_SCREEN_BUFFER_WIDTH 512
