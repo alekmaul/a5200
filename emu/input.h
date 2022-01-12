@@ -250,9 +250,14 @@ extern int joy_autofire[4];		/* autofire mode for each Atari port */
 extern int joy_multijoy;	/* emulate MultiJoy4 interface */
 
 /* 5200 joysticks values */
-#define JOY_5200_MIN    6
+#define JOY_5200_MIN    8
 #define JOY_5200_CENTER 114
 #define JOY_5200_MAX    220
+
+extern unsigned int joy_5200_digital_min;
+extern unsigned int joy_5200_digital_max;
+extern unsigned int joy_5200_analog_min;
+extern unsigned int joy_5200_analog_max;
 
 extern unsigned int joy_5200_trig[4];
 extern unsigned int joy_5200_stick[4];

@@ -55,6 +55,11 @@ int joy_autofire[4] = {AUTOFIRE_OFF, AUTOFIRE_OFF, AUTOFIRE_OFF, AUTOFIRE_OFF};
 
 int joy_multijoy = 0;
 
+unsigned int joy_5200_digital_min = JOY_5200_MIN;
+unsigned int joy_5200_digital_max = JOY_5200_MAX;
+unsigned int joy_5200_analog_min  = JOY_5200_MIN;
+unsigned int joy_5200_analog_max  = JOY_5200_MAX;
+
 int mouse_mode = MOUSE_OFF;
 int mouse_port = 0;
 int mouse_delta_x = 0;
@@ -245,20 +250,20 @@ void INPUT_Frame(void) {
 			PCPOT_input[(i << 1) + 1] = Atari_POT((i << 1) + 1);
 		}
 		else {
-			if ((STICK[i] & (STICK_CENTRE ^ STICK_LEFT)) == 0) {	
-				PCPOT_input[(i << 1) + 0]= JOY_5200_MIN; 
+			if ((STICK[i] & (STICK_CENTRE ^ STICK_LEFT)) == 0) {
+				PCPOT_input[(i << 1) + 0] = joy_5200_digital_min;
 			}
 			else if ((STICK[i] & (STICK_CENTRE ^ STICK_RIGHT)) == 0) {
-				PCPOT_input[(i << 1) + 0]= JOY_5200_MAX; 
+				PCPOT_input[(i << 1) + 0] = joy_5200_digital_max;
 			}
 			else {
-				PCPOT_input[(i << 1) + 0] = JOY_5200_CENTER;  
+				PCPOT_input[(i << 1) + 0] = JOY_5200_CENTER;
 			}
 			if ((STICK[i] & (STICK_CENTRE ^ STICK_FORWARD)) == 0) {
-				PCPOT_input[(i << 1) + 1]= JOY_5200_MIN;
+				PCPOT_input[(i << 1) + 1] = joy_5200_digital_min;
 			}
 			else if ((STICK[i] & (STICK_CENTRE ^ STICK_BACK)) == 0) {
-				PCPOT_input[(i << 1) + 1]= JOY_5200_MAX;
+				PCPOT_input[(i << 1) + 1] = joy_5200_digital_max;
 			}
 			else {
 				PCPOT_input[(i << 1) + 1] = JOY_5200_CENTER;
