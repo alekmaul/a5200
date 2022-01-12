@@ -211,7 +211,6 @@ enum input_hack_type
 static unsigned input_shift_ctrl       = 0;
 static enum input_hack_type input_hack = INPUT_HACK_NONE;
 static int input_analog_deadzone       = (int)(0.15f * (float)LIBRETRO_ANALOG_RANGE);
-static float input_analog_sensitivity  = 1.0f;
 static bool input_analog_quadratic     = false;
 
 static uint8_t *rom_buf        = NULL;
@@ -507,10 +506,11 @@ static void initialise_palette(void)
    }
 }
 
-static void check_variables(void)
+/* BIOS core option must be checked once
+ * (and only once) before content is loaded */
+static void check_bios_variable(void)
 {
    struct retro_variable var = {0};
-   enum frame_blend_method blend_method;
 
    /* BIOS */
    var.key                 = "a5200_bios";
@@ -521,6 +521,12 @@ static void check_variables(void)
        !string_is_empty(var.value) &&
        string_is_equal(var.value, "internal"))
       a5200_use_official_bios = false;
+}
+
+static void check_variables(void)
+{
+   struct retro_variable var = {0};
+   enum frame_blend_method blend_method;
 
    /* Interframe Blending */
    var.key      = "a5200_mix_frames";
@@ -580,19 +586,55 @@ static void check_variables(void)
          input_hack = INPUT_HACK_SWAP_PORTS;
    }
 
-   /* Analog Sensitivity */
-   var.key                  = "a5200_analog_sensitivity";
-   var.value                = NULL;
-   input_analog_sensitivity = 1.0f;
+   /* Digital Joystick Sensitivity */
+   var.key              = "a5200_digital_sensitivity";
+   var.value            = NULL;
+   joy_5200_digital_min = JOY_5200_MIN;
+   joy_5200_digital_max = JOY_5200_MAX;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
        !string_is_empty(var.value))
    {
-      unsigned sensitivity     = string_to_unsigned(var.value);
-      input_analog_sensitivity = (float)sensitivity / 100.0f;
+      float range;
+
+      if (string_is_equal(var.value, "auto"))
+         range = cart_info.joy_digital_range;
+      else
+         range = (float)string_to_unsigned(var.value) / 100.0f;
+
+      joy_5200_digital_min = JOY_5200_CENTER -
+            (unsigned int)(((float)(JOY_5200_CENTER - JOY_5200_MIN) *
+                  range) + 0.5f);
+      joy_5200_digital_max = JOY_5200_CENTER +
+            (unsigned int)(((float)(JOY_5200_MAX - JOY_5200_CENTER) *
+                  range) + 0.5f);
    }
 
-   /* Analog Response */
+   /* Analog Joystick Sensitivity */
+   var.key             = "a5200_analog_sensitivity";
+   var.value           = NULL;
+   joy_5200_analog_min = JOY_5200_MIN;
+   joy_5200_analog_max = JOY_5200_MAX;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
+       !string_is_empty(var.value))
+   {
+      float range;
+
+      if (string_is_equal(var.value, "auto"))
+         range = cart_info.joy_analog_range;
+      else
+         range = (float)string_to_unsigned(var.value) / 100.0f;
+
+      joy_5200_analog_min = JOY_5200_CENTER -
+            (unsigned int)(((float)(JOY_5200_CENTER - JOY_5200_MIN) *
+                  range) + 0.5f);
+      joy_5200_analog_max = JOY_5200_CENTER +
+            (unsigned int)(((float)(JOY_5200_MAX - JOY_5200_CENTER) *
+                  range) + 0.5f);
+   }
+
+   /* Analog Joystick Response */
    var.key                = "a5200_analog_response";
    var.value              = NULL;
    input_analog_quadratic = false;
@@ -602,7 +644,7 @@ static void check_variables(void)
        string_is_equal(var.value, "enabled"))
       input_analog_quadratic = true;
 
-   /* Analog Deadzone */
+   /* Analog Joystick Deadzone */
    var.key               = "a5200_analog_deadzone";
    var.value             = NULL;
    input_analog_deadzone = (int)(0.15f * (float)LIBRETRO_ANALOG_RANGE);
@@ -624,9 +666,6 @@ static INLINE unsigned int a5200_get_analog_pot(int input)
                (input + input_analog_deadzone)) /
                      (float)(LIBRETRO_ANALOG_RANGE - input_analog_deadzone);
 
-   /* Apply sensitivity correction */
-   amplitude *= input_analog_sensitivity;
-
    /* Check whether analog response is quadratic */
    if (input_analog_quadratic)
    {
@@ -639,10 +678,10 @@ static INLINE unsigned int a5200_get_analog_pot(int input)
    /* Map to Atari 5200 values */
    if (amplitude >= 0.0f)
       return JOY_5200_CENTER +
-            (unsigned int)(((float)(JOY_5200_MAX - JOY_5200_CENTER) * amplitude) + 0.5f);
+            (unsigned int)(((float)(joy_5200_analog_max - JOY_5200_CENTER) * amplitude) + 0.5f);
 
    return JOY_5200_CENTER +
-         (unsigned int)(((float)(JOY_5200_CENTER - JOY_5200_MIN) * amplitude) - 0.5f);
+         (unsigned int)(((float)(JOY_5200_CENTER - joy_5200_analog_min) * amplitude) - 0.5f);
 }
 
 static unsigned a5200_get_analog_numpad_key(int input_x, int input_y)
@@ -1084,10 +1123,8 @@ bool retro_load_game(const struct retro_game_info *info)
    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
          input_descriptors);
 
-   /* Apply initial core options */
-   check_variables();
-
    /* Load bios */
+   check_bios_variable();
    load_bios();
 
    /* Load game */
@@ -1098,6 +1135,9 @@ bool retro_load_game(const struct retro_game_info *info)
    }
 
    Atari800_Initialise();
+
+   /* Apply initial core options */
+   check_variables();
 
    return true;
 
@@ -1183,12 +1223,11 @@ void retro_init(void)
    audio_out_buffer     = (int16_t*)malloc((A5200_AUDIO_BUFFER_SIZE << 1) *
          sizeof(int16_t));
 
-   input_shift_ctrl         = 0;
-   input_hack               = INPUT_HACK_NONE;
-   input_analog_sensitivity = 1.0f;
-   input_analog_quadratic   = false;
-   audio_low_pass_prev      = 0;
-   a5200_use_official_bios  = true;
+   input_shift_ctrl        = 0;
+   input_hack              = INPUT_HACK_NONE;
+   input_analog_quadratic  = false;
+   audio_low_pass_prev     = 0;
+   a5200_use_official_bios = true;
 
    initialise_palette();
    Screen_Initialise(a5200_screen_buffer);
@@ -1199,7 +1238,6 @@ void retro_deinit(void)
    libretro_supports_bitmasks = false;
    input_shift_ctrl           = 0;
    input_hack                 = INPUT_HACK_NONE;
-   input_analog_sensitivity   = 1.0f;
    input_analog_quadratic     = false;
    audio_low_pass_prev        = 0;
    a5200_use_official_bios    = true;

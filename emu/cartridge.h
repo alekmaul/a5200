@@ -22,6 +22,8 @@ struct cart_info_t
 	const char *md5;
 	int type;
 	int keys_debounced;
+	float joy_digital_range;
+	float joy_analog_range;
 	const char *name;
 };
 
