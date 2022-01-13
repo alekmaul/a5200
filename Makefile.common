@@ -12,6 +12,7 @@ ifneq (,$(findstring msvc2003,$(platform)))
 endif
 
 SOURCES_C := \
+	$(LIBRETRO_DIR)/a5200_osk.c \
 	$(LIBRETRO_DIR)/libretro.c \
 	$(CORE_SRC_DIR)/altirra_5200_os.c \
 	$(CORE_SRC_DIR)/antic.c \
