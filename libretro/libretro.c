@@ -690,8 +690,8 @@ static INLINE unsigned int a5200_get_analog_pot(int input)
       return JOY_5200_CENTER +
             (unsigned int)(((float)(joy_5200_analog_max - JOY_5200_CENTER) * amplitude) + 0.5f);
 
-   return JOY_5200_CENTER +
-         (unsigned int)(((float)(JOY_5200_CENTER - joy_5200_analog_min) * amplitude) - 0.5f);
+   return JOY_5200_CENTER -
+         (unsigned int)(((float)(JOY_5200_CENTER - joy_5200_analog_min) * -amplitude) + 0.5f);
 }
 
 static unsigned a5200_get_analog_numpad_key(int input_x, int input_y)
