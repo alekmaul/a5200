@@ -19,6 +19,7 @@
 
 #include <libretro.h>
 #include "libretro_core_options.h"
+#include "a5200_osk.h"
 
 #include "altirra_5200_os.h"
 #include "atari.h"
@@ -82,6 +83,10 @@ static retro_audio_sample_batch_t audio_batch_cb;
 #define A5200_JOY_CENTER 114
 #define A5200_VIRTUAL_NUMPAD_THRESHOLD 0.7
 #define A5200_NUM_PADS 2
+
+/* Delay (in frames) between OSK cursor
+ * movements when holding a direction */
+#define A5200_OSK_CURSOR_REPEAT_DELAY 10
 
 static const uint32_t a5200_palette_ntsc[A5200_PALETTE_SIZE] = {
    0x000000, 0x252525, 0x343434, 0x4F4F4F,
@@ -167,12 +172,13 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "Joystick Up (Digital)" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "Joystick Down (Digital)" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "Joystick Right (Digital)" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Fire 1" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Fire 1 / OSK Select" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Fire 2" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "NumPad #" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "NumPad *" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "NumPad 0" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "NumPad 5" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Show/Hide OSK" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Pause" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Start" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,  RETRO_DEVICE_ID_ANALOG_X, "Joystick X (Analog)" },
@@ -212,6 +218,10 @@ static unsigned input_shift_ctrl       = 0;
 static enum input_hack_type input_hack = INPUT_HACK_NONE;
 static int input_analog_deadzone       = (int)(0.15f * (float)LIBRETRO_ANALOG_RANGE);
 static bool input_analog_quadratic     = false;
+
+static bool input_show_osk             = false;
+static bool input_osk_toggle_lock      = false;
+static uint16_t input_osk_cursor_latch = 0;
 
 static uint8_t *rom_buf        = NULL;
 static const uint8_t *rom_data = NULL;
@@ -736,8 +746,6 @@ static void update_input(void)
 {
    size_t pad_idx;
 
-   input_poll_cb();
-
    key_code   = 0;
    key_shift  = 0;
    key_consol = CONSOL_NONE;
@@ -753,7 +761,6 @@ static void update_input(void)
       int left_analog_y;
       int right_analog_x;
       int right_analog_y;
-      size_t i;
 
       /* Set a well-defined initial state */
       joy_5200_stick[pad]          = STICK_CENTRE;
@@ -767,9 +774,12 @@ static void update_input(void)
          joypad_bits = input_state_cb(pad_idx,
                RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
       else
+      {
+         size_t i;
          for (i = 0; i < (RETRO_DEVICE_ID_JOYPAD_R3+1); i++)
             joypad_bits |= input_state_cb(pad_idx,
                   RETRO_DEVICE_JOYPAD, 0, i) ? (1 << i) : 0;
+      }
 
       /* D-Pad */
       if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_UP))
@@ -865,6 +875,17 @@ static void update_input(void)
             key_code += a5200_get_analog_numpad_key(right_analog_x, right_analog_y);
       }
 
+      /* OSK toggle */
+      if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_L))
+      {
+         if (!input_osk_toggle_lock)
+            input_show_osk = true;
+
+         input_osk_toggle_lock = true;
+      }
+      else
+         input_osk_toggle_lock = false;
+
       /* Dual stick hack
        * > Maps player 2's joystick to the right
        *   analog stick of player 1's RetroPad
@@ -902,6 +923,71 @@ static void update_input(void)
    }
 }
 
+static void update_input_osk(void)
+{
+   size_t pad_idx;
+   unsigned joypad_bits = 0;
+
+   key_code   = 0;
+   key_shift  = 0;
+   key_consol = CONSOL_NONE;
+
+   /* Disable input from all emulated controllers */
+   for (pad_idx = 0; pad_idx < A5200_NUM_PADS; pad_idx++)
+   {
+      joy_5200_stick[pad_idx]          = STICK_CENTRE;
+      joy_5200_trig[pad_idx]           = 1;
+      atari_analog[pad_idx]            = 0;
+      joy_5200_pot[(pad_idx << 1) + 0] = JOY_5200_CENTER;
+      joy_5200_pot[(pad_idx << 1) + 1] = JOY_5200_CENTER;
+   }
+
+   /* Read input from RetroPad 0 */
+   if (libretro_supports_bitmasks)
+      joypad_bits = input_state_cb(0,
+            RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+   else
+   {
+      size_t i;
+      for (i = 0; i < (RETRO_DEVICE_ID_JOYPAD_R3+1); i++)
+         joypad_bits |= input_state_cb(0,
+               RETRO_DEVICE_JOYPAD, 0, i) ? (1 << i) : 0;
+   }
+
+   /* Handle key press */
+   if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_A))
+      key_code += a5200_osk_get_key();
+
+   /* Move cursor */
+   if ((joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_LEFT)) ||
+       (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_RIGHT)))
+   {
+      if (input_osk_cursor_latch > 0)
+         input_osk_cursor_latch--;
+
+      if (input_osk_cursor_latch == 0)
+      {
+         a5200_osk_move_cursor(joypad_bits &
+               (1 << RETRO_DEVICE_ID_JOYPAD_LEFT) ?
+                     -1 : 1);
+         input_osk_cursor_latch = A5200_OSK_CURSOR_REPEAT_DELAY;
+      }
+   }
+   else
+      input_osk_cursor_latch = 0;
+
+   /* OSK toggle */
+   if (joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_L))
+   {
+      if (!input_osk_toggle_lock)
+         input_show_osk = false;
+
+      input_osk_toggle_lock = true;
+   }
+   else
+      input_osk_toggle_lock = false;
+}
+
 static void update_video(void)
 {
    uint16_t *video_buffer_ptr = video_buffer;
@@ -919,6 +1005,10 @@ static void update_video(void)
 
    if (blend_frames)
       blend_frames();
+
+   if (input_show_osk)
+      a5200_osk_draw(video_buffer, A5200_VIDEO_WIDTH,
+            A5200_VIDEO_HEIGHT);
 
    video_cb(video_buffer, A5200_VIDEO_WIDTH, A5200_VIDEO_HEIGHT,
          A5200_VIDEO_WIDTH << 1);
@@ -1226,11 +1316,15 @@ void retro_init(void)
    input_shift_ctrl        = 0;
    input_hack              = INPUT_HACK_NONE;
    input_analog_quadratic  = false;
+   input_show_osk          = false;
+   input_osk_toggle_lock   = false;
+   input_osk_cursor_latch  = 0;
    audio_low_pass_prev     = 0;
    a5200_use_official_bios = true;
 
    initialise_palette();
    Screen_Initialise(a5200_screen_buffer);
+   a5200_osk_init();
 }
 
 void retro_deinit(void)
@@ -1239,6 +1333,9 @@ void retro_deinit(void)
    input_shift_ctrl           = 0;
    input_hack                 = INPUT_HACK_NONE;
    input_analog_quadratic     = false;
+   input_show_osk             = false;
+   input_osk_toggle_lock      = false;
+   input_osk_cursor_latch     = 0;
    audio_low_pass_prev        = 0;
    a5200_use_official_bios    = true;
 
@@ -1275,6 +1372,8 @@ void retro_deinit(void)
       free(audio_out_buffer);
       audio_out_buffer = NULL;
    }
+
+   a5200_osk_deinit();
 }
 
 void retro_reset(void)
@@ -1292,7 +1391,11 @@ void retro_run(void)
       check_variables();
 
    /* Update input */
-   update_input();
+   input_poll_cb();
+   if (input_show_osk)
+      update_input_osk();
+   else
+      update_input();
 
    /* Run emulator */
    Atari800_Frame(0);
