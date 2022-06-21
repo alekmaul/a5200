@@ -144,13 +144,6 @@ void (*Update_serio_sound)(int out, UBYTE data) = null_serio_sound;
 int serio_sound_enabled = 1;
 #endif
 
-#ifdef CONSOLE_SOUND
-static void Update_consol_sound_rf(int set);
-static void null_consol_sound(int set) {}
-void (*Update_consol_sound)(int set) = null_consol_sound;
-int console_sound_enabled = 1;
-#endif
-
 #ifdef VOL_ONLY_SOUND
 static void Update_vol_only_sound_rf(void);
 static void null_vol_only_sound(void) {}
@@ -208,9 +201,6 @@ static int Pokey_sound_init_rf(uint32 freq17, uint16 playback_freq,
 	Update_pokey_sound = Update_pokey_sound_rf;
 #ifdef SERIO_SOUND
 	Update_serio_sound = Update_serio_sound_rf;
-#endif
-#ifdef CONSOLE_SOUND
-	Update_consol_sound = Update_consol_sound_rf;
 #endif
 #ifdef VOL_ONLY_SOUND
 	Update_vol_only_sound = Update_vol_only_sound_rf;
@@ -858,59 +848,8 @@ static void Update_serio_sound_rf(int out, UBYTE data)
 }
 #endif /* SERIO_SOUND */
 
-#ifdef CONSOLE_SOUND
-static void Update_consol_sound_rf(int set)
-{
-#ifdef VOL_ONLY_SOUND
-	static int prev_atari_speaker = 0;
-	static unsigned int prev_cpu_clock = 0;
-	int d;
-	if (!console_sound_enabled)
-		return;
-
-	if (!set && samp_consol_val == 0)
-		return;
-	sampbuf_lastval -= samp_consol_val;
-	if (prev_atari_speaker != atari_speaker) {
-		samp_consol_val = atari_speaker * 8 * 4;	/* gain */
-		prev_cpu_clock = cpu_clock;
-	}
-	else if (!set) {
-		d = cpu_clock - prev_cpu_clock;
-		if (d < 114) {
-			sampbuf_lastval += samp_consol_val;
-			return;
-		}
-		while (d >= 114 /* CPUL */) {
-			samp_consol_val = samp_consol_val * 99 / 100;
-			d -= 114;
-		}
-		prev_cpu_clock = cpu_clock - d;
-	}
-	sampbuf_lastval += samp_consol_val;
-	prev_atari_speaker = atari_speaker;
-
-	sampbuf_val[sampbuf_ptr] = sampbuf_lastval;
-	sampbuf_cnt[sampbuf_ptr] =
-		(cpu_clock - sampbuf_last) * 128 * samp_freq / 178979;
-	sampbuf_last = cpu_clock;
-	sampbuf_ptr++;
-	if (sampbuf_ptr >= SAMPBUF_MAX)
-		sampbuf_ptr = 0;
-	if (sampbuf_ptr == sampbuf_rptr) {
-		sampbuf_rptr++;
-		if (sampbuf_rptr >= SAMPBUF_MAX)
-			sampbuf_rptr = 0;
-	}
-#endif  /* VOL_ONLY_SOUND */
-}
-#endif /* CONSOLE_SOUND */
-
 #ifdef VOL_ONLY_SOUND
 static void Update_vol_only_sound_rf(void)
 {
-#ifdef CONSOLE_SOUND
-	Update_consol_sound(0);	/* mmm */
-#endif /* CONSOLE_SOUND */
 }
 #endif  /* VOL_ONLY_SOUND */

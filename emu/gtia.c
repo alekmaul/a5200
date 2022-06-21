@@ -571,9 +571,6 @@ void GTIA_PutByte(UWORD addr, UBYTE byte)
 	switch (addr & 0x1f) {
 	case _CONSOL:
 		atari_speaker = !(byte & 0x08);
-#ifdef CONSOLE_SOUND
-		Update_consol_sound(1);
-#endif
 		consol_mask = (~byte) & 0x0f;
 		break;
 

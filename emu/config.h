@@ -9,8 +9,6 @@
 
 //#define INTERPOLATE_SOUND 1
 
-//#define CONSOLE_SOUND 1
-
 #define CLIP_SOUND 1
 
 //#undef PAGED_ATTRIB
