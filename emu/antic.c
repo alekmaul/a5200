@@ -1338,19 +1338,6 @@ static void draw_an_gtia11(const ULONG *t_pm_scanline_ptr)
 #define ADD_FONT_CYCLES xpos += font_cycles[md]
 #endif
 
-#ifdef PAGED_MEM
-
-#define INIT_ANTIC_2	int t_chbase = (dctr ^ chbase_20) & 0xfc07;\
-	ADD_FONT_CYCLES;\
-	blank_lookup[0x60] = (anticmode == 2 || dctr & 0xe) ? 0xff : 0;\
-	blank_lookup[0x00] = blank_lookup[0x20] = blank_lookup[0x40] = (dctr & 0xe) == 8 ? 0 : 0xff;
-
-#define GET_CHDATA_ANTIC_2	chdata = (screendata & invert_mask) ? 0xff : 0;\
-	if (blank_lookup[screendata & blank_mask])\
-		chdata ^= dGetByte(t_chbase + ((UWORD) (screendata & 0x7f) << 3));
-
-#else /* PAGED_MEM */
-
 #define INIT_ANTIC_2	const UBYTE *chptr;\
 	if (antic_xe_ptr != NULL && chbase_20 < 0x8000 && chbase_20 >= 0x4000)\
 		chptr = antic_xe_ptr + ((dctr ^ chbase_20) & 0x3c07);\
@@ -1363,8 +1350,6 @@ static void draw_an_gtia11(const ULONG *t_pm_scanline_ptr)
 #define GET_CHDATA_ANTIC_2	chdata = (screendata & invert_mask) ? 0xff : 0;\
 	if (blank_lookup[screendata & blank_mask])\
 		chdata ^= chptr[(screendata & 0x7f) << 3];
-
-#endif /* PAGED_MEM */
 
 static void draw_antic_2(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, const ULONG *t_pm_scanline_ptr)
 {
@@ -1464,15 +1449,11 @@ static void draw_antic_2_artif(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr
 static void prepare_an_antic_2(int nchars, const UBYTE *ANTIC_memptr, const ULONG *t_pm_scanline_ptr)
 {
 	UBYTE *an_ptr = (UBYTE *) t_pm_scanline_ptr + (an_scanline - pm_scanline);
-#ifdef PAGED_MEM
-	int t_chbase = (dctr ^ chbase_20) & 0xfc07;
-#else
 	const UBYTE *chptr;
 	if (antic_xe_ptr != NULL && chbase_20 < 0x8000 && chbase_20 >= 0x4000)
 		chptr = antic_xe_ptr + ((dctr ^ chbase_20) & 0x3c07);
 	else
 		chptr = memory + ((dctr ^ chbase_20) & 0xfc07);
-#endif
 
 	CHAR_LOOP_BEGIN
 		UBYTE screendata = *ANTIC_memptr++;
@@ -1651,15 +1632,11 @@ static void draw_antic_2_gtia11(int nchars, const UBYTE *ANTIC_memptr, UWORD *pt
 static void draw_antic_4(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, const ULONG *t_pm_scanline_ptr)
 {
 	INIT_BACKGROUND_8
-#ifdef PAGED_MEM
-	UWORD t_chbase = ((anticmode == 4 ? dctr : dctr >> 1) ^ chbase_20) & 0xfc07;
-#else
 	const UBYTE *chptr;
 	if (antic_xe_ptr != NULL && chbase_20 < 0x8000 && chbase_20 >= 0x4000)
 		chptr = antic_xe_ptr + (((anticmode == 4 ? dctr : dctr >> 1) ^ chbase_20) & 0x3c07);
 	else
 		chptr = memory + (((anticmode == 4 ? dctr : dctr >> 1) ^ chbase_20) & 0xfc07);
-#endif
 
 	ADD_FONT_CYCLES;
 	lookup2[0x0f] = lookup2[0x00] = cl_lookup[C_BAK];
@@ -1678,11 +1655,7 @@ static void draw_antic_4(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, cons
 			lookup = lookup2 + 0xf;
 		else
 			lookup = lookup2;
-#ifdef PAGED_MEM
-		chdata = dGetByte(t_chbase + ((UWORD) (screendata & 0x7f) << 3));
-#else
 		chdata = chptr[(screendata & 0x7f) << 3];
-#endif
 		if (IS_ZERO_ULONG(t_pm_scanline_ptr)) {
 			if (chdata) {
 				WRITE_VIDEO(ptr++, lookup[chdata & 0xc0]);
@@ -1714,26 +1687,18 @@ static void draw_antic_4(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, cons
 static void prepare_an_antic_4(int nchars, const UBYTE *ANTIC_memptr, const ULONG *t_pm_scanline_ptr)
 {
 	UBYTE *an_ptr = (UBYTE *) t_pm_scanline_ptr + (an_scanline - pm_scanline);
-#ifdef PAGED_MEM
-	UWORD t_chbase = ((anticmode == 4 ? dctr : dctr >> 1) ^ chbase_20) & 0xfc07;
-#else
 	const UBYTE *chptr;
 	if (antic_xe_ptr != NULL && chbase_20 < 0x8000 && chbase_20 >= 0x4000)
 		chptr = antic_xe_ptr + (((anticmode == 4 ? dctr : dctr >> 1) ^ chbase_20) & 0x3c07);
 	else
 		chptr = memory + (((anticmode == 4 ? dctr : dctr >> 1) ^ chbase_20) & 0xfc07);
-#endif
 
 	ADD_FONT_CYCLES;
 	CHAR_LOOP_BEGIN
 		UBYTE screendata = *ANTIC_memptr++;
 		UBYTE an;
 		UBYTE chdata;
-#ifdef PAGED_MEM
-		chdata = dGetByte(t_chbase + ((UWORD) (screendata & 0x3f) << 3));
-#else
 		chdata = chptr[(screendata & 0x3f) << 3];
-#endif
 		an = mode_e_an_lookup[chdata & 0xc0];
 		*an_ptr++ = (an == 2 && screendata & 0x80) ? 3 : an;
 		an = mode_e_an_lookup[chdata & 0x30];
@@ -1749,15 +1714,11 @@ DEFINE_DRAW_AN(4)
 
 static void draw_antic_6(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, const ULONG *t_pm_scanline_ptr)
 {
-#ifdef PAGED_MEM
-	UWORD t_chbase = (anticmode == 6 ? dctr & 7 : dctr >> 1) ^ chbase_20;
-#else
 	const UBYTE *chptr;
 	if (antic_xe_ptr != NULL && chbase_20 < 0x8000 && chbase_20 >= 0x4000)
 		chptr = antic_xe_ptr + (((anticmode == 6 ? dctr & 7 : dctr >> 1) ^ chbase_20) - 0x4000);
 	else
 		chptr = memory + ((anticmode == 6 ? dctr & 7 : dctr >> 1) ^ chbase_20);
-#endif
 
 	ADD_FONT_CYCLES;
 	CHAR_LOOP_BEGIN
@@ -1766,11 +1727,7 @@ static void draw_antic_6(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, cons
 		UWORD colour;
 		int kk = 2;
 		colour = COLOUR((playfield_lookup + 0x40)[screendata & 0xc0]);
-#ifdef PAGED_MEM
-		chdata = dGetByte(t_chbase + ((UWORD) (screendata & 0x3f) << 3));
-#else
 		chdata = chptr[(screendata & 0x3f) << 3];
-#endif
 		do {
 			if (IS_ZERO_ULONG(t_pm_scanline_ptr)) {
 				if (chdata & 0xf0) {
@@ -1829,26 +1786,17 @@ static void draw_antic_6(int nchars, const UBYTE *ANTIC_memptr, UWORD *ptr, cons
 static void prepare_an_antic_6(int nchars, const UBYTE *ANTIC_memptr, const ULONG *t_pm_scanline_ptr)
 {
 	UBYTE *an_ptr = (UBYTE *) t_pm_scanline_ptr + (an_scanline - pm_scanline);
-#ifdef PAGED_MEM
-	UWORD t_chbase = (anticmode == 6 ? dctr & 7 : dctr >> 1) ^ chbase_20;
-#else
 	const UBYTE *chptr;
 	if (antic_xe_ptr != NULL && chbase_20 < 0x8000 && chbase_20 >= 0x4000)
 		chptr = antic_xe_ptr + (((anticmode == 6 ? dctr & 7 : dctr >> 1) ^ chbase_20) - 0x4000);
 	else
 		chptr = memory + ((anticmode == 6 ? dctr & 7 : dctr >> 1) ^ chbase_20);
-#endif
 
 	ADD_FONT_CYCLES;
 	CHAR_LOOP_BEGIN
 		UBYTE screendata = *ANTIC_memptr++;
-		UBYTE an = screendata >> 6;
-		UBYTE chdata;
-#ifdef PAGED_MEM
-		chdata = dGetByte(t_chbase + ((UWORD) (screendata & 0x3f) << 3));
-#else
-		chdata = chptr[(screendata & 0x3f) << 3];
-#endif
+		UBYTE an         = screendata >> 6;
+		UBYTE chdata     = chptr[(screendata & 0x3f) << 3];
 		*an_ptr++ = chdata & 0x80 ? an : 0;
 		*an_ptr++ = chdata & 0x40 ? an : 0;
 		*an_ptr++ = chdata & 0x20 ? an : 0;
@@ -2586,19 +2534,6 @@ UWORD ANTIC_GetDLWord(UWORD *paddr)
    nor screen+47 in wide playfield. This function does. */
 static void ANTIC_load(void)
 {
-#ifdef PAGED_MEM
-	UBYTE *ANTIC_memptr = ANTIC_memory + ANTIC_margin;
-	UWORD new_screenaddr = screenaddr + chars_read[md];
-	if ((screenaddr ^ new_screenaddr) & 0xf000) {
-		do
-			*ANTIC_memptr++ = dGetByte(screenaddr++);
-		while (screenaddr & 0xfff);
-		screenaddr -= 0x1000;
-		new_screenaddr -= 0x1000;
-	}
-	while (screenaddr < new_screenaddr)
-		*ANTIC_memptr++ = dGetByte(screenaddr++);
-#else
 	UWORD new_screenaddr = screenaddr + chars_read[md];
 	if ((screenaddr ^ new_screenaddr) & 0xf000) {
 		int bytes = (-screenaddr) & 0xfff;
@@ -2628,7 +2563,6 @@ static void ANTIC_load(void)
 			dCopyFromMem(screenaddr, ANTIC_memory + ANTIC_margin, chars_read[md]);
 		screenaddr = new_screenaddr;
 	}
-#endif
 }
 
 #ifdef NEW_CYCLE_EXACT

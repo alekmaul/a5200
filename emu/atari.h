@@ -4,20 +4,14 @@
 #include "config.h"
 #include <stdio.h> /* FILENAME_MAX */
 #include <stdint.h>
-#ifdef WIN32
-#include <windows.h>
+#ifdef _WIN32
+#include <windows.h> /* For ULONG/SLONG */
 #endif
 
 /* Fundamental declarations ---------------------------------------------- */
 
 //#define DIRTYRECT
 //#define NODIRTYCOMPARE
-
-//#define PAGED_MEM
-
-/* Note: Save states do not function correctly
- * when PAGED_ATTRIB is set */
-//#define PAGED_ATTRIB 1
 
 #define ATARI_TITLE  "Atari 800 Emulator, Version 2.0.2"
 

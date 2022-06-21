@@ -37,11 +37,5 @@ UBYTE CART_GetByte(UWORD addr);
 void CART_PutByte(UWORD addr, UBYTE byte);
 void CART_BountyBob1(UWORD addr);
 void CART_BountyBob2(UWORD addr);
-#ifdef PAGED_ATTRIB
-UBYTE BountyBob1_GetByte(UWORD addr);
-UBYTE BountyBob2_GetByte(UWORD addr);
-void BountyBob1_PutByte(UWORD addr, UBYTE value);
-void BountyBob2_PutByte(UWORD addr, UBYTE value);
-#endif
 
 #endif /* _CARTRIDGE_H_ */

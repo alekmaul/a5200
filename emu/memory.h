@@ -41,40 +41,12 @@ extern UBYTE memory[65536 + 2];
 #define ROM       1
 #define HARDWARE  2
 
-#ifndef PAGED_ATTRIB
-
 extern UBYTE attrib[65536];
 #define GetByte(addr)		(attrib[addr] == HARDWARE ? Atari800_GetByte(addr) : memory[addr])
 #define PutByte(addr, byte)	 do { if (attrib[addr] == RAM) memory[addr] = byte; else if (attrib[addr] == HARDWARE) Atari800_PutByte(addr, byte); } while (0)
 #define SetRAM(addr1, addr2) memset(attrib + (addr1), RAM, (addr2) - (addr1) + 1)
 #define SetROM(addr1, addr2) memset(attrib + (addr1), ROM, (addr2) - (addr1) + 1)
 #define SetHARDWARE(addr1, addr2) memset(attrib + (addr1), HARDWARE, (addr2) - (addr1) + 1)
-
-#else /* PAGED_ATTRIB */
-
-typedef UBYTE (*rdfunc)(UWORD addr);
-typedef void (*wrfunc)(UWORD addr, UBYTE value);
-extern rdfunc readmap[256];
-extern wrfunc writemap[256];
-void ROM_PutByte(UWORD addr, UBYTE byte);
-#define GetByte(addr)		(readmap[(addr) >> 8] ? (*readmap[(addr) >> 8])(addr) : memory[addr])
-#define PutByte(addr,byte)	(writemap[(addr) >> 8] ? (*writemap[(addr) >> 8])(addr, byte) : (memory[addr] = byte))
-#define SetRAM(addr1, addr2) do { \
-		int i; \
-		for (i = (addr1) >> 8; i <= (addr2) >> 8; i++) { \
-			readmap[i] = NULL; \
-			writemap[i] = NULL; \
-		} \
-	} while (0)
-#define SetROM(addr1, addr2) do { \
-		int i; \
-		for (i = (addr1) >> 8; i <= (addr2) >> 8; i++) { \
-			readmap[i] = NULL; \
-			writemap[i] = ROM_PutByte; \
-		} \
-	} while (0)
-
-#endif /* PAGED_ATTRIB */
 
 extern int have_basic;
 extern int cartA0BF_enabled;

@@ -130,7 +130,6 @@
 /* XXX: we do this only for GTIA, because NEW_CYCLE_EXACT does not correctly
    emulate INC $D400 (and INC $D40A wasn't tested) */
 #ifdef NEW_CYCLE_EXACT
-#ifndef PAGED_ATTRIB
 #define RMW_GetByte(x, addr) \
 	if (attrib[addr] == HARDWARE) { \
 		x = Atari800_GetByte(addr); \
@@ -141,15 +140,6 @@
 		} \
 	} else \
 		x = dGetByte(addr);
-#else /* PAGED_ATTRIB */
-#define RMW_GetByte(x, addr) \
-	x = GetByte(addr); \
-	if ((addr & 0xef00) == 0xc000) { \
-		xpos--; \
-		PutByte(addr, x); \
-		xpos++; \
-	}
-#endif /* PAGED_ATTRIB */
 #else /* NEW_CYCLE_EXACT */
 /* Don't emulate the first write */
 #define RMW_GetByte(x, addr) x = GetByte(addr);

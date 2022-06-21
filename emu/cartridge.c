@@ -308,42 +308,6 @@ void CART_BountyBob2(UWORD addr)
 	}
 }
 
-#ifdef PAGED_ATTRIB
-UBYTE BountyBob1_GetByte(UWORD addr)
-{
-	if (addr >= 0x4ff6 && addr <= 0x4ff9) {
-		CART_BountyBob1(addr);
-		return 0;
-	}
-
-	return dGetByte(addr);
-}
-
-UBYTE BountyBob2_GetByte(UWORD addr)
-{
-	if (addr >= 0x5ff6 && addr <= 0x5ff9) {
-		CART_BountyBob2(addr);
-		return 0;
-	}
-
-	return dGetByte(addr);
-}
-
-void BountyBob1_PutByte(UWORD addr, UBYTE value)
-{
-	if (addr >= 0x4ff6 && addr <= 0x4ff9) {
-		CART_BountyBob1(addr);
-	}
-}
-
-void BountyBob2_PutByte(UWORD addr, UBYTE value)
-{
-	if (addr >= 0x5ff6 && addr <= 0x5ff9) {
-		CART_BountyBob2(addr);
-	}
-}
-#endif
-
 int CART_Insert(const uint8_t *data, size_t size)
 {
 	const struct cart_info_t *cart_info_entry = NULL;
@@ -429,15 +393,8 @@ void CART_Start(void) {
 		CopyROM(0x5000, 0x5fff, cart_image + 0x4000);
 		CopyROM(0x8000, 0x9fff, cart_image + 0x8000);
 		CopyROM(0xa000, 0xbfff, cart_image + 0x8000);
-#ifndef PAGED_ATTRIB
 		SetHARDWARE(0x4ff6, 0x4ff9);
 		SetHARDWARE(0x5ff6, 0x5ff9);
-#else
-		readmap[0x4f] = BountyBob1_GetByte;
-		readmap[0x5f] = BountyBob2_GetByte;
-		writemap[0x4f] = BountyBob1_PutByte;
-		writemap[0x5f] = BountyBob2_PutByte;
-#endif
 		break;
 	case CART_5200_NS_16:
 		CopyROM(0x8000, 0xbfff, cart_image);
