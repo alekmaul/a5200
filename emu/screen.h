@@ -6,11 +6,6 @@
 #define ATARI_VISIBLE_WIDTH 336
 #define ATARI_LEFT_MARGIN 24
 
-#ifdef DIRTYRECT
-#ifndef CLIENTUPDATE
-extern UBYTE *screen_dirty;
-#endif
-#endif
 void entire_screen_dirty(void);
 
 extern UWORD *atari_screen;

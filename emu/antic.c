@@ -87,103 +87,12 @@ int prior_pos_buf[PRIOR_BUF_SIZE];
 
 /* Video memory access is hidden behind these macros. It allows to track dirty video memory
    to improve video system performance */
-#ifdef DIRTYRECT
-
-static UWORD *scratchUWordPtr;
-static UWORD scratchUWord;
-static ULONG *scratchULongPtr;
-static ULONG scratchULong;
-static UBYTE *scratchUBytePtr;
-static UBYTE scratchUByte;
-
-#ifdef NODIRTYCOMPARE
-
-#define WRITE_VIDEO(ptr, val) \
-	do { \
-		scratchUWordPtr = (ptr); \
-		screen_dirty[((ULONG) scratchUWordPtr - (ULONG) atari_screen) >> 3] = 1; \
-		*scratchUWordPtr = (val); \
-	} while (0);
-#define WRITE_VIDEO_LONG(ptr, val) \
-	do { \
-		scratchULongPtr = (ptr); \
-		screen_dirty[((ULONG) scratchULongPtr - (ULONG) atari_screen) >> 3] = 1; \
-		*scratchULongPtr = (val); \
-	} while (0)
-#define WRITE_VIDEO_BYTE(ptr, val) \
-	do { \
-		scratchUBytePtr = (ptr); \
-		screen_dirty[((ULONG) scratchUBytePtr - (ULONG) atari_screen) >> 3] = 1; \
-		*scratchUBytePtr = (val); \
-	} while (0)
-#define FILL_VIDEO(ptr, val, size) \
-	do { \
-		scratchUBytePtr = (UBYTE*) (ptr); \
-		scratchULong = (ULONG) (size); \
-		memset(screen_dirty + (((ULONG) scratchUBytePtr - (ULONG) atari_screen) >> 3), 1, scratchULong >> 3); \
-		memset(scratchUBytePtr, (val), scratchULong); \
-	} while (0)
-
-#else /* NODIRTYCOMPARE */
-
-#define WRITE_VIDEO(ptr, val) \
-	do { \
-		scratchUWordPtr = (ptr); \
-		scratchUWord = (val); \
-		if (*scratchUWordPtr != scratchUWord) { \
-			screen_dirty[((ULONG) scratchUWordPtr - (ULONG) atari_screen) >> 3] = 1; \
-			*scratchUWordPtr = scratchUWord; \
-		} \
-	} while (0)
-#define WRITE_VIDEO_LONG(ptr, val) \
-	do { \
-		scratchULongPtr = (ptr); \
-		scratchULong = (val); \
-		if (*scratchULongPtr != scratchULong) { \
-			screen_dirty[((ULONG) scratchULongPtr - (ULONG) atari_screen) >> 3] = 1; \
-			*scratchULongPtr = scratchULong; \
-		} \
-	} while (0)
-#define WRITE_VIDEO_BYTE(ptr, val) \
-	do { \
-		scratchUBytePtr = (ptr); \
-		scratchUByte = (val); \
-		if (*scratchUBytePtr != scratchUByte) { \
-			screen_dirty[((ULONG) scratchUBytePtr - (ULONG) atari_screen) >> 3] = 1; \
-			*scratchUBytePtr = scratchUByte; \
-		} \
-	} while (0)
-static UBYTE *scratchFillLimit;
-#define FILL_VIDEO(ptr, val, size) \
-	do { \
-		scratchUBytePtr = (UBYTE *) (ptr); \
-		scratchUByte = (UBYTE) (val); \
-		scratchFillLimit = scratchUBytePtr + (size); \
-		for (; scratchUBytePtr < scratchFillLimit; scratchUBytePtr++) { \
-			if (*scratchUBytePtr != scratchUByte) { \
-				screen_dirty[((ULONG) scratchUBytePtr - (ULONG) atari_screen) >> 3] = 1; \
-				*scratchUBytePtr = scratchUByte; \
-			} \
-		} \
-	} while (0)
-
-#endif /* NODIRTYCOMPARE */
-
-void entire_screen_dirty(void)
-{
-	memset(screen_dirty, 1, ATARI_WIDTH * ATARI_HEIGHT / 8);
-}
-
-#else /* DIRTYRECT */
-
 #define WRITE_VIDEO(ptr, val) (*(ptr) = val)
 #define WRITE_VIDEO_LONG(ptr, val) (*(ptr) = val)
 #define WRITE_VIDEO_BYTE(ptr, val) (*(ptr) = val)
 #define FILL_VIDEO(ptr, val, size) memset(ptr, val, size)
 
 void entire_screen_dirty(void) {}
-
-#endif /* DIRTYRECT */
 
 #define READ_VIDEO_LONG(ptr) (*(ptr))
 
@@ -200,12 +109,7 @@ void video_putbyte(UBYTE *ptr, UBYTE val) {
 /* Some optimizations result in unaligned 32-bit accesses. These macros have
    been introduced for machines that don't allow unaligned memory accesses. */
 
-#ifdef DIRTYRECT
-/* STAT_UNALIGNED_WORDS doesn't work with DIRTYRECT */
-#define WRITE_VIDEO_LONG_UNALIGNED  WRITE_VIDEO_LONG
-#else
 #define WRITE_VIDEO_LONG_UNALIGNED(ptr, val)  UNALIGNED_PUT_LONG((ptr), (val), atari_screen_write_long_stat)
-#endif
 
 //ALEK 
 //#ifdef WORDS_UNALIGNED_OK
@@ -972,10 +876,6 @@ void ANTIC_Initialise(void) {
 #endif /* NEW_CYCLE_EXACT */
 
 #endif /* !defined(BASIC) && !defined(CURSES_BASIC) */
-
-#ifdef DIRTYRECT
-		screen_dirty = (UBYTE *) Util_malloc(ATARI_HEIGHT * ATARI_WIDTH / 8);
-#endif
 }
 
 void ANTIC_Reset(void) {

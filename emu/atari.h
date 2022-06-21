@@ -10,7 +10,6 @@
 
 /* Fundamental declarations ---------------------------------------------- */
 
-//#define DIRTYRECT
 //#define NODIRTYCOMPARE
 
 #define ATARI_TITLE  "Atari 800 Emulator, Version 2.0.2"

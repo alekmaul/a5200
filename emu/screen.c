@@ -34,10 +34,6 @@
 
 UWORD *atari_screen = NULL;
 
-#ifdef DIRTYRECT
-UBYTE *screen_dirty = NULL;
-#endif
-
 void Screen_Initialise(unsigned char *buf)
 {
 	atari_screen = (UWORD *)buf;
