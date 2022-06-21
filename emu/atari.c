@@ -119,7 +119,6 @@ int enable_sio_patch = TRUE;
 
 int verbose = FALSE;
 
-//unsigned int nframes = 0;
 //int refresh_rate = 1;
 int sprite_collisions_in_skipped_frames = FALSE;
 
@@ -601,7 +600,6 @@ void Atari800_Frame(unsigned int refresh_rate) {
 		ANTIC_Frame(FALSE);
 	}
   POKEY_Frame();
-	//nframes++;
 }
 
 #endif /* __PLUS */

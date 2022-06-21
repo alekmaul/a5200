@@ -232,7 +232,6 @@ void INPUT_Frame(void) {
 
 		TRIG_input[i] = Atari_TRIG(i);
 		//ALEK if ((joy_autofire[i] == AUTOFIRE_FIRE && !TRIG_input[i]) || (joy_autofire[i] == AUTOFIRE_CONT))
-		//ALEK 	TRIG_input[i] = (nframes & 2) ? 1 : 0;
 	}
 
 /*
