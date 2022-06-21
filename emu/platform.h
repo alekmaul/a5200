@@ -15,9 +15,4 @@ unsigned int Atari_PORT(unsigned int num);
 unsigned int Atari_TRIG(unsigned int num);
 unsigned int Atari_POT(unsigned int num);
 
-#ifdef SUPPORTS_ATARI_CONFIGINIT
-/* This function sets the configuration parameters to default values */
-void Atari_ConfigInit(void);
-#endif
-
 #endif /* _PLATFORM_H_ */
