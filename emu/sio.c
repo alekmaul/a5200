@@ -740,23 +740,12 @@ void SIO(void)
 
 UBYTE SIO_ChkSum(const UBYTE *buffer, int length)
 {
-#if 0
-	/* old, less efficient version */
-	int i;
-	int checksum = 0;
-	for (i = 0; i < length; i++, buffer++) {
-		checksum += *buffer;
-		while (checksum > 255)
-			checksum -= 255;
-	}
-#else
 	int checksum = 0;
 	while (--length >= 0)
 		checksum += *buffer++;
 	do
 		checksum = (checksum & 0xff) + (checksum >> 8);
 	while (checksum > 255);
-#endif
 	return checksum;
 }
 
@@ -865,35 +854,6 @@ static UBYTE Command_Frame(void)
 /* Enable/disable the Tape Motor */
 void SIO_TapeMotor(int onoff)
 {
-#if 0
-	/* if sio is patched, do not do anything */
-	if (enable_sio_patch)
-		return;
-	if (onoff) {
-		/* set frame to cassette frame, if not */
-		/* in a transfer with an intelligent peripheral */
-		if (TransferStatus == SIO_NoFrame) {
-			TransferStatus = SIO_CasRead;
-			CASSETTE_TapeMotor(onoff);
-			DELAYED_SERIN_IRQ = CASSETTE_GetInputIRQDelay();
-		}
-		else {
-			CASSETTE_TapeMotor(onoff);
-		}
-	}
-	else {
-		/* set frame to none */
-		if (TransferStatus == SIO_CasRead) {
-			TransferStatus = SIO_NoFrame;
-			CASSETTE_TapeMotor(onoff);
-			DELAYED_SERIN_IRQ = 0; /* off */
-		}
-		else {
-			CASSETTE_TapeMotor(onoff);
-			DELAYED_SERIN_IRQ = 0; /* off */
-		}
-	}
-#endif
 }
 
 /* Enable/disable the command frame */

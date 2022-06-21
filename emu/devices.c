@@ -471,9 +471,6 @@ static UBYTE Device_RemoveDirectory(const char *filename)
 
 /* H: device emulation --------------------------------------------------- */
 
-/* emulator debugging mode */
-static int devbug = FALSE;
-
 /* host path for each H: unit */
 char atari_h_dir[4][FILENAME_MAX] = { "", "", "", "" };
 
@@ -736,11 +733,6 @@ static void Device_H_Open(void)
 
 	if (h_fp[h_iocb] != NULL)
 		Util_fclose(h_fp[h_iocb], h_tmpbuf[h_iocb]);
-
-#if 0
-	if (devbug)
-		iprintf("atari_filename=\"%s\", atari_path=\"%s\" host_path=\"%s\"", atari_filename, atari_path, host_path);
-#endif
 
 	fp = NULL;
 	h_wascr[h_iocb] = FALSE;
@@ -1355,7 +1347,6 @@ static void Device_H_BinLoaderCont(void)
 
 static void Device_H_LoadProceed(int mydos)
 {
-	/* iprintf("MyDOS %d, AX1 %d, AX2 %d", mydos, dGetByte(ICAX1Z), dGetByte(ICAX2Z)); */
 	if (mydos) {
 		switch (dGetByte(ICAX1Z) /* XXX: & 7 ? */) {
 		case 4:
@@ -1468,17 +1459,10 @@ static void Device_H_FileLength(void)
 	else {
 		int iocb = IOCB0 + h_iocb * 16;
 		int filesize;
-#if 0
-		/* old, less portable implementation */
-		struct stat fstatus;
-		fstat(fileno(h_fp[h_iocb]), &fstatus);
-		filesize = fstatus.st_size;
-#else
 		FILE *fp = h_fp[h_iocb];
 		long currentpos = ftell(fp);
 		filesize = Util_flen(fp);
 		fseek(fp, currentpos, SEEK_SET);
-#endif
 		dPutByte(iocb + ICAX3, (UBYTE) filesize);
 		dPutByte(iocb + ICAX4, (UBYTE) (filesize >> 8));
 		dPutByte(iocb + ICAX5, (UBYTE) (filesize >> 16));

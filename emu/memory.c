@@ -78,51 +78,14 @@ static void AllocXEMemory(void)
 
 void MEMORY_InitialiseMachine(void) {
 	antic_xe_ptr = NULL;
-#if 0
-	switch (machine_type) {
-	case MACHINE_OSA:
-	case MACHINE_OSB:
-		memcpy(memory + 0xd800, atari_os, 0x2800);
-		Atari800_PatchOS();
-		dFillMem(0x0000, 0x00, ram_size * 1024 - 1);
-		SetRAM(0x0000, ram_size * 1024 - 1);
-		if (ram_size < 52) {
-			dFillMem(ram_size * 1024, 0xff, 0xd000 - ram_size * 1024);
-			SetROM(ram_size * 1024, 0xcfff);
-		}
-		SetHARDWARE(0xd000, 0xd7ff);
-		SetROM(0xd800, 0xffff);
-		break;
-	case MACHINE_XLXE:
-		memcpy(memory + 0xc000, atari_os, 0x4000);
-		Atari800_PatchOS();
-		if (ram_size == 16) {
-			dFillMem(0x0000, 0x00, 0x4000);
-			SetRAM(0x0000, 0x3fff);
-			dFillMem(0x4000, 0xff, 0x8000);
-			SetROM(0x4000, 0xcfff);
-		} else {
-			dFillMem(0x0000, 0x00, 0xc000);
-			SetRAM(0x0000, 0xbfff);
-			SetROM(0xc000, 0xcfff);
-		}
-		SetHARDWARE(0xd000, 0xd7ff);
-		SetROM(0xd800, 0xffff);
-		break;
-	case MACHINE_5200:
-#endif  
-		memcpy(memory + 0xf800, atari_os, 0x800);
-		dFillMem(0x0000, 0x00, 0xf800);
-		SetRAM(0x0000, 0x3fff);
-		SetROM(0x4000, 0xffff);
-		SetHARDWARE(0xc000, 0xc0ff);	/* 5200 GTIA Chip */
-		SetHARDWARE(0xd400, 0xd4ff);	/* 5200 ANTIC Chip */
-		SetHARDWARE(0xe800, 0xe8ff);	/* 5200 POKEY Chip */
-		SetHARDWARE(0xeb00, 0xebff);	/* 5200 POKEY Chip */
-#if 0
-		break;
-	}
-#endif  
+	memcpy(memory + 0xf800, atari_os, 0x800);
+	dFillMem(0x0000, 0x00, 0xf800);
+	SetRAM(0x0000, 0x3fff);
+	SetROM(0x4000, 0xffff);
+	SetHARDWARE(0xc000, 0xc0ff);	/* 5200 GTIA Chip */
+	SetHARDWARE(0xd400, 0xd4ff);	/* 5200 ANTIC Chip */
+	SetHARDWARE(0xe800, 0xe8ff);	/* 5200 POKEY Chip */
+	SetHARDWARE(0xeb00, 0xebff);	/* 5200 POKEY Chip */
 	AllocXEMemory();
 	Coldstart();
 }

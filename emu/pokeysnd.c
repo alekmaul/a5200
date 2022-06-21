@@ -118,15 +118,8 @@ uint8 snd_num_pokeys = 1;
 static int snd_flags = 0;
 static int mz_quality = 0;		/* default quality for mzpokeysnd */
 
-# if 0 //LUDO:
-int enable_new_pokey = TRUE;
-#ifndef ASAP
-int stereo_enabled = FALSE;
-#endif
-# else
 int enable_new_pokey = FALSE;
 int stereo_enabled   = FALSE;
-# endif
 
 /* multiple sound engine interface */
 static void null_pokey_process(void *sndbuffer, unsigned int sndn) {}
@@ -242,18 +235,8 @@ static int Pokey_sound_init_rf(uint32 freq17, uint16 playback_freq,
 }
 
 int Pokey_DoInit(void) {
-# if 0 //LUDO:
-	if (enable_new_pokey) {
-		return Pokey_sound_init_mz(snd_freq17, (uint16) snd_playback_freq,
-				snd_num_pokeys, snd_flags, mz_quality
-		);
-  }
-	else 
-# endif
-  {
-		return Pokey_sound_init_rf(snd_freq17, (uint16) snd_playback_freq,
-				snd_num_pokeys, snd_flags);
-  }
+	return Pokey_sound_init_rf(snd_freq17, (uint16) snd_playback_freq,
+	snd_num_pokeys, snd_flags);
 }
 
 int 

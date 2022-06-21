@@ -113,24 +113,12 @@ void video_putbyte(UBYTE *ptr, UBYTE val) {
 
 //ALEK 
 //#ifdef WORDS_UNALIGNED_OK
-#if 1
 #define IS_ZERO_ULONG(x) (! UNALIGNED_GET_LONG(x, pm_scanline_read_long_stat))
 #define DO_GTIA_BYTE(p, l, x) { \
 		WRITE_VIDEO_LONG_UNALIGNED((ULONG *) (p),     (l)[(x) >> 4]); \
 		WRITE_VIDEO_LONG_UNALIGNED((ULONG *) (p) + 1, (l)[(x) & 0xf]); \
 	}
   
-#else /* WORDS_UNALIGNED_OK */
-#define IS_ZERO_ULONG(x) (!((const UBYTE *)(x))[0] && !((const UBYTE *)(x))[1] && !((const UBYTE *)(x))[2] && !((const UBYTE *)(x))[3])
-#define DO_GTIA_BYTE(p, l, x) { \
-		/*UNALIGNED_PUT_LONG((ULONG *) (p),     (l)[(x) >> 4], pm_scanline_read_long_stat); \
-		UNALIGNED_PUT_LONG((ULONG *) (p) + 1, (l)[(x) & 0xf], pm_scanline_read_long_stat);*/ \
-    WRITE_VIDEO((UWORD *) (p),     (UWORD) ((l)[(x) >> 4])); \
-		WRITE_VIDEO((UWORD *) (p) + 1, (UWORD) ((l)[(x) >> 4])); \
-		WRITE_VIDEO((UWORD *) (p) + 2, (UWORD) ((l)[(x) & 0xf])); \
-		WRITE_VIDEO((UWORD *) (p) + 3, (UWORD) ((l)[(x) & 0xf]));  \
-	}
-#endif /* WORDS_UNALIGNED_OK */
     
 /* ANTIC Registers --------------------------------------------------------- */
 
@@ -518,8 +506,6 @@ UWORD cl_lookup[128];
    Artifacting also uses unaligned long access if it's supported. */
 
 //ALEK
-#if 1
-//#ifdef WORDS_UNALIGNED_OK
 
 #define INIT_BACKGROUND_6 ULONG background = cl_lookup[C_PF2] | (((ULONG) cl_lookup[C_PF2]) << 16);
 #define INIT_BACKGROUND_8 ULONG background = lookup_gtia9[0];
@@ -533,27 +519,6 @@ UWORD cl_lookup[128];
 		WRITE_VIDEO_LONG_UNALIGNED(((ULONG *) ptr) + 1, art_curtable[(UBYTE) (screendata_tally >> 6)]); \
 		ptr += 4; \
 	}
-
-//#if 0
-#else
-
-#define INIT_BACKGROUND_6
-#define INIT_BACKGROUND_8
-#define DRAW_BACKGROUND(colreg) {\
-		WRITE_VIDEO(ptr,     cl_lookup[colreg]); \
-		WRITE_VIDEO(ptr + 1, cl_lookup[colreg]); \
-		WRITE_VIDEO(ptr + 2, cl_lookup[colreg]); \
-		WRITE_VIDEO(ptr + 3, cl_lookup[colreg]); \
-		ptr += 4;\
-	}
-#define DRAW_ARTIF {\
-		WRITE_VIDEO(ptr++, ((UWORD *) art_curtable)[(screendata_tally & 0x03fc00) >> 9]); \
-		WRITE_VIDEO(ptr++, ((UWORD *) art_curtable)[((screendata_tally & 0x03fc00) >> 9) + 1]); \
-		WRITE_VIDEO(ptr++, ((UWORD *) art_curtable)[(screendata_tally & 0x003fc0) >> 5]); \
-		WRITE_VIDEO(ptr++, ((UWORD *) art_curtable)[((screendata_tally & 0x003fc0) >> 5) + 1]); \
-	}
-
-#endif /* WORDS_UNALIGNED_OK */
 
 /* Hi-res modes optimizations
    Now hi-res modes are drawn with words, not bytes. Endianess defaults
@@ -1416,11 +1381,7 @@ static void draw_antic_2_gtia10(int nchars, const UBYTE *ANTIC_memptr, UWORD *pt
 {
 //ALEK 
 //#ifdef WORDS_UNALIGNED_OK
-#if 1
 	ULONG lookup_gtia10[16];
-#else
-UWORD lookup_gtia10[16];
-#endif
 	INIT_ANTIC_2
 	if ((unsigned long) ptr & 2) { /* HSCROL & 1 */
 		prepare_an_antic_2(nchars, ANTIC_memptr, t_pm_scanline_ptr);
@@ -1430,7 +1391,6 @@ UWORD lookup_gtia10[16];
 
 //ALEK 
 //#ifdef WORDS_UNALIGNED_OK
-#if 1
 	lookup_gtia10[0] = cl_lookup[C_PM0] | (cl_lookup[C_PM0] << 16);
 	lookup_gtia10[1] = cl_lookup[C_PM1] | (cl_lookup[C_PM1] << 16);
 	lookup_gtia10[2] = cl_lookup[C_PM2] | (cl_lookup[C_PM2] << 16);
@@ -1441,17 +1401,6 @@ UWORD lookup_gtia10[16];
 	lookup_gtia10[15] = lookup_gtia10[7] = cl_lookup[C_PF3] | (cl_lookup[C_PF3] << 16);
 	lookup_gtia10[8] = lookup_gtia10[9] = lookup_gtia10[10] = lookup_gtia10[11] = lookup_gtia9[0];
 //ALEK 
-#else
- 	lookup_gtia10[0] = cl_lookup[C_PM0];
- 	lookup_gtia10[1] = cl_lookup[C_PM1];
- 	lookup_gtia10[2] = cl_lookup[C_PM2];
- 	lookup_gtia10[3] = cl_lookup[C_PM3];
- 	lookup_gtia10[12] = lookup_gtia10[4] = cl_lookup[C_PF0];
- 	lookup_gtia10[13] = lookup_gtia10[5] = cl_lookup[C_PF1];
- 	lookup_gtia10[14] = lookup_gtia10[6] = cl_lookup[C_PF2];
- 	lookup_gtia10[15] = lookup_gtia10[7] = cl_lookup[C_PF3];
- 	lookup_gtia10[8] = lookup_gtia10[9] = lookup_gtia10[10] = lookup_gtia10[11] = cl_lookup[C_BAK];
-#endif
 	ptr++;
 	t_pm_scanline_ptr = (const ULONG *) (((const UBYTE *) t_pm_scanline_ptr) + 1);
 	CHAR_LOOP_BEGIN
@@ -2116,11 +2065,7 @@ static void draw_antic_f_gtia10(int nchars, const UBYTE *ANTIC_memptr, UWORD *pt
 {
 //ALEK 
 //#ifdef WORDS_UNALIGNED_OK
-#if 1
 	ULONG lookup_gtia10[16];
-#else
-UWORD lookup_gtia10[16];
-#endif
 	if ((unsigned long) ptr & 2) { /* HSCROL & 1 */
 		prepare_an_antic_f(nchars, ANTIC_memptr, t_pm_scanline_ptr);
 		draw_an_gtia10(t_pm_scanline_ptr);
@@ -2128,7 +2073,6 @@ UWORD lookup_gtia10[16];
 	}
 //ALEK 
 //#ifdef WORDS_UNALIGNED_OK
-#if 1
 	lookup_gtia10[0] = cl_lookup[C_PM0] | (cl_lookup[C_PM0] << 16);
 	lookup_gtia10[1] = cl_lookup[C_PM1] | (cl_lookup[C_PM1] << 16);
 	lookup_gtia10[2] = cl_lookup[C_PM2] | (cl_lookup[C_PM2] << 16);
@@ -2139,17 +2083,6 @@ UWORD lookup_gtia10[16];
 	lookup_gtia10[15] = lookup_gtia10[7] = cl_lookup[C_PF3] | (cl_lookup[C_PF3] << 16);
 	lookup_gtia10[8] = lookup_gtia10[9] = lookup_gtia10[10] = lookup_gtia10[11] = lookup_gtia9[0];
 //ALEK 
-#else
-	lookup_gtia10[0] = cl_lookup[C_PM0];
-	lookup_gtia10[1] = cl_lookup[C_PM1];
-	lookup_gtia10[2] = cl_lookup[C_PM2];
-	lookup_gtia10[3] = cl_lookup[C_PM3];
-	lookup_gtia10[12] = lookup_gtia10[4] = cl_lookup[C_PF0];
-	lookup_gtia10[13] = lookup_gtia10[5] = cl_lookup[C_PF1];
-	lookup_gtia10[14] = lookup_gtia10[6] = cl_lookup[C_PF2];
-	lookup_gtia10[15] = lookup_gtia10[7] = cl_lookup[C_PF3];
-	lookup_gtia10[8] = lookup_gtia10[9] = lookup_gtia10[10] = lookup_gtia10[11] = cl_lookup[C_BAK];
-#endif
 	ptr++;
 	t_pm_scanline_ptr = (const ULONG *) (((const UBYTE *) t_pm_scanline_ptr) + 1);
 	CHAR_LOOP_BEGIN

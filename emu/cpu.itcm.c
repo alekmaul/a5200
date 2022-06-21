@@ -107,12 +107,7 @@
 #define PHPC                { UWORD tmp = PC - memory; PHW(tmp); }
 #define GET_CODE_BYTE()     (*PC++)
 #define PEEK_CODE_BYTE()    (*PC)
-//#if !defined(WORDS_BIGENDIAN) && defined(WORDS_UNALIGNED_OK)
-#if 1
 #define PEEK_CODE_WORD()    (*(const UWORD *) PC)
-#else
-#define PEEK_CODE_WORD()    (*PC + (PC[1] << 8))
-#endif
 #else /* PC_PTR */
 #define GET_PC()            PC
 #define SET_PC(newpc)       (PC = (newpc))
